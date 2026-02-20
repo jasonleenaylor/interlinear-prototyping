@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { type Occurrence, buildLinkedGroups } from "@/lib/interlinear-types";
 import { sampleInterlinearization, sampleAnalyses } from "@/lib/sample-data";
 import { adaptToUiOccurrences } from "@/lib/adapt-sample-data";
@@ -18,7 +18,11 @@ export function useInterlinear() {
   );
   const [activeIndex, setActiveIndex] = useState(0);
 
-  const linkedGroups = buildLinkedGroups(occurrences);
+  // Memoized so dependent values (occurrenceGroupMap) only rebuild when occurrences change
+  const linkedGroups = useMemo(
+    () => buildLinkedGroups(occurrences),
+    [occurrences],
+  );
 
   // Keep a ref to linkedGroups to avoid stale closures
   const linkedGroupsRef = useRef(linkedGroups);
@@ -32,6 +36,24 @@ export function useInterlinear() {
       activeIndex >= g.startIndex &&
       activeIndex < g.startIndex + g.occurrences.length,
   );
+
+  // Canonical segments — stable reference (source data never changes at runtime)
+  const segments = useMemo(
+    () => sampleInterlinearization.books[0]?.segments ?? [],
+    [],
+  );
+
+  // O(1) lookup: canonical occurrence ID → group index.
+  // Used by the source text click handlers — eliminates positional findIndex drift.
+  const occurrenceGroupMap = useMemo(() => {
+    const map = new Map<string, number>();
+    for (let gi = 0; gi < linkedGroups.length; gi++) {
+      for (const occ of linkedGroups[gi].occurrences) {
+        map.set(occ.id, gi);
+      }
+    }
+    return map;
+  }, [linkedGroups]);
 
   const moveForward = useCallback(() => {
     setActiveIndex((prev) => {
@@ -166,20 +188,19 @@ export function useInterlinear() {
   const canGoForward = activeGroupIndex < linkedGroups.length - 1;
 
   /** Jump directly to a group by its group index. */
-  const goToGroup = useCallback(
-    (groupIndex: number) => {
-      const groups = linkedGroupsRef.current;
-      const target = groups[groupIndex];
-      if (target) setActiveIndex(target.startIndex);
-    },
-    [],
-  );
+  const goToGroup = useCallback((groupIndex: number) => {
+    const groups = linkedGroupsRef.current;
+    const target = groups[groupIndex];
+    if (target) setActiveIndex(target.startIndex);
+  }, []);
 
   return {
     occurrences,
     activeIndex,
     activeGroupIndex,
     linkedGroups,
+    segments,
+    occurrenceGroupMap,
     moveForward,
     moveBackward,
     toggleApprove,

@@ -9,6 +9,7 @@ import { useRowOrder } from "@/hooks/use-row-order";
 import { Button } from "@/components/ui/button";
 import { Settings2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { OccurrenceType } from "@/lib/interlinear-model";
 
 /**
  * The main interlinearizer component.
@@ -27,6 +28,8 @@ export function Interlinearizer() {
     occurrences,
     activeGroupIndex,
     linkedGroups,
+    segments,
+    occurrenceGroupMap,
     moveForward,
     moveBackward,
     toggleApprove,
@@ -42,7 +45,14 @@ export function Interlinearizer() {
   const stripRef = useRef<HTMLDivElement>(null);
   const groupRefs = useRef<Map<number, HTMLDivElement>>(new Map());
 
+  // ID → approved status; drives source text colour without re-running findIndex
+  const occApprovedById = useMemo(
+    () => new Map(occurrences.map((o) => [o.id, o.approved])),
+    [occurrences],
+  );
+
   const [translateX, setTranslateX] = useState(0);
+  const [isFading, setIsFading] = useState(false);
 
   // Recalculate translateX whenever the active group changes
   const recalcTranslate = useCallback(() => {
@@ -56,24 +66,56 @@ export function Interlinearizer() {
 
   /**
    * Click a non-active group to make it active.
-   * Alignment:
-   *  - clicked group was LEFT of active  → pin its LEFT edge at ACTIVE_LEFT_PX
-   *  - clicked group was RIGHT of active → pin its RIGHT edge at ACTIVE_LEFT_PX
+   * Always pins the clicked group's LEFT edge at ACTIVE_LEFT_PX — this matches what
+   * recalcTranslate computes once goToGroup triggers a re-render, so there is no
+   * competing CSS transition override.
    */
   const clickGroup = useCallback(
     (gi: number) => {
       if (gi === activeGroupIndex) return;
       const el = groupRefs.current.get(gi);
       if (!el) return;
-
-      if (gi < activeGroupIndex) {
-        // Left side: left-edge align
-        setTranslateX(ACTIVE_LEFT_PX - el.offsetLeft);
-      } else {
-        // Right side: right-edge align
-        setTranslateX(ACTIVE_LEFT_PX - (el.offsetLeft + el.offsetWidth));
-      }
+      // Always use left-edge alignment — this matches what recalcTranslate computes
+      // after goToGroup triggers a re-render, so there is no competing override animation.
+      setTranslateX(ACTIVE_LEFT_PX - el.offsetLeft);
       goToGroup(gi);
+    },
+    [activeGroupIndex, goToGroup],
+  );
+
+  /**
+   * Navigate to a group with a fade animation — used by text-area word clicks.
+   *
+   * Sequence:
+   *  1. setIsFading(true) → strip goes opacity-0, transition-none applied.
+   *  2. 200 ms later (inside setTimeout): setTranslateX(correct) + goToGroup(gi)
+   *     are batched by React 18 into ONE render where isFading is still true.
+   *     transition-none is active → position snaps invisibly.
+   *  3. Browser paints Frame N with correct translateX, strip still transparent.
+   *  4. RAF fires (start of Frame N+1, after Frame N's paint):
+   *     setIsFading(false) → strip fades in. translateX is unchanged in this
+   *     render, so transition-transform has nothing to animate.
+   *
+   * Explicitly setting translateX (rather than relying on recalcTranslate) is
+   * critical: recalcTranslate runs in useEffect which fires AFTER paint, too late
+   * to guarantee the position is correct before the RAF fires.
+   */
+  const fadeToGroup = useCallback(
+    (gi: number) => {
+      if (gi === activeGroupIndex) return;
+      setIsFading(true);
+      setTimeout(() => {
+        // Compute position directly from the DOM ref — same formula as recalcTranslate.
+        // Batched with goToGroup in one React 18 render while isFading=true.
+        const el = groupRefs.current.get(gi);
+        if (el) setTranslateX(ACTIVE_LEFT_PX - el.offsetLeft);
+        goToGroup(gi);
+        // RAF fires after Frame N paints the new (invisible) position.
+        // translateX won't change in this render → no slide animation.
+        requestAnimationFrame(() => {
+          setIsFading(false);
+        });
+      }, 200);
     },
     [activeGroupIndex, goToGroup],
   );
@@ -142,69 +184,77 @@ export function Interlinearizer() {
       {/* Strip + optional settings panel side-by-side */}
       <div className="flex items-start gap-2">
         <div
-          className="overflow-hidden relative flex-1"
+          className={cn(
+            "overflow-hidden relative flex-1 transition-opacity duration-200",
+            isFading && "opacity-0",
+          )}
           role="region"
           aria-label="Scripture interlinear view"
         >
           {/* Translating strip */}
           <div
             ref={stripRef}
-            className="flex items-start gap-0 w-max py-1 transition-transform duration-300 ease-in-out"
+            className={cn(
+              "flex items-start gap-0 w-max py-1",
+              isFading
+                ? "transition-none"
+                : "transition-transform duration-300 ease-in-out",
+            )}
             style={{ transform: `translateX(${translateX}px)` }}
           >
-          {renderItems.map((item) => {
-            if (item.type === "group") {
-              const gi = item.groupIndex;
-              const group = linkedGroups[gi];
-              const isActive = gi === activeGroupIndex;
-              const distance = Math.abs(gi - activeGroupIndex);
-              // 5% opacity reduction per occurrence distance, minimum 15%
-              const opacity = Math.max(0.15, 1 - distance * 0.05);
+            {renderItems.map((item) => {
+              if (item.type === "group") {
+                const gi = item.groupIndex;
+                const group = linkedGroups[gi];
+                const isActive = gi === activeGroupIndex;
+                const distance = Math.abs(gi - activeGroupIndex);
+                // 5% opacity reduction per occurrence distance, minimum 15%
+                const opacity = Math.max(0.15, 1 - distance * 0.05);
 
+                return (
+                  <div
+                    key={`group-${group.startIndex}`}
+                    ref={(el) => {
+                      if (el) {
+                        groupRefs.current.set(gi, el);
+                      } else {
+                        groupRefs.current.delete(gi);
+                      }
+                    }}
+                    className={cn("shrink-0", !isActive && "cursor-pointer")}
+                    style={{ opacity: isActive ? 1 : opacity }}
+                    onClick={!isActive ? () => clickGroup(gi) : undefined}
+                  >
+                    <OccurrenceBox
+                      group={group}
+                      isActive={isActive}
+                      rowOrder={rowOrder.activeOrder}
+                      onApprove={toggleApprove}
+                      onForward={moveForward}
+                      onBackward={moveBackward}
+                      onUpdateGloss={updateGloss}
+                      onUpdateMorphemeText={updateMorphemeText}
+                      onUnlink={toggleLink}
+                      canGoBack={canGoBack}
+                      canGoForward={canGoForward}
+                    />
+                  </div>
+                );
+              }
+
+              // Link button
               return (
                 <div
-                  key={`group-${group.startIndex}`}
-                  ref={(el) => {
-                    if (el) {
-                      groupRefs.current.set(gi, el);
-                    } else {
-                      groupRefs.current.delete(gi);
-                    }
-                  }}
-                  className={cn("shrink-0", !isActive && "cursor-pointer")}
-                  style={{ opacity: isActive ? 1 : opacity }}
-                  onClick={!isActive ? () => clickGroup(gi) : undefined}
+                  key={`link-${item.occIndex}`}
+                  className="flex items-start shrink-0"
                 >
-                  <OccurrenceBox
-                    group={group}
-                    isActive={isActive}
-                    rowOrder={rowOrder.activeOrder}
-                    onApprove={toggleApprove}
-                    onForward={moveForward}
-                    onBackward={moveBackward}
-                    onUpdateGloss={updateGloss}
-                    onUpdateMorphemeText={updateMorphemeText}
-                    onUnlink={toggleLink}
-                    canGoBack={canGoBack}
-                    canGoForward={canGoForward}
+                  <LinkButton
+                    isLinked={item.isLinked}
+                    onClick={() => toggleLink(item.occIndex)}
                   />
                 </div>
               );
-            }
-
-            // Link button
-            return (
-              <div
-                key={`link-${item.occIndex}`}
-                className="flex items-start shrink-0"
-              >
-                <LinkButton
-                  isLinked={item.isLinked}
-                  onClick={() => toggleLink(item.occIndex)}
-                />
-              </div>
-            );
-          })}
+            })}
           </div>
         </div>
 
@@ -225,32 +275,38 @@ export function Interlinearizer() {
           Source Text
         </p>
         <p className="text-sm font-mono leading-relaxed text-foreground">
-          {occurrences.map((occ, i) => {
-            const isInActiveGroup =
-              i >= linkedGroups[activeGroupIndex]?.startIndex &&
-              i <
-                linkedGroups[activeGroupIndex]?.startIndex +
-                  linkedGroups[activeGroupIndex]?.occurrences.length;
+          {segments.flatMap((seg, si) =>
+            seg.occurrences.map((occ, oi) => {
+              const groupIndex = occurrenceGroupMap.get(occ.id) ?? -1;
+              const isInActiveGroup = groupIndex === activeGroupIndex;
+              const approved = occApprovedById.get(occ.id) ?? false;
+              const isPunct = occ.type === OccurrenceType.Punctuation;
+              // Look ahead across segment boundaries for spacing
+              const nextOcc =
+                seg.occurrences[oi + 1] ?? segments[si + 1]?.occurrences[0];
+              const isLastToken =
+                si === segments.length - 1 && oi === seg.occurrences.length - 1;
+              const nextIsPunct = nextOcc?.type === OccurrenceType.Punctuation;
 
-            return (
-              <span
-                key={occ.id}
-                className={cn(
-                  "transition-colors",
-                  isInActiveGroup && "bg-sky-200 rounded px-0.5",
-                  occ.approved && !isInActiveGroup && "text-emerald-700",
-                  !occ.approved && !isInActiveGroup && "text-muted-foreground",
-                )}
-              >
-                {occ.text}
-                {!occ.isPunctuation &&
-                  i < occurrences.length - 1 &&
-                  !occurrences[i + 1]?.isPunctuation &&
-                  " "}
-                {occ.isPunctuation && i < occurrences.length - 1 && " "}
-              </span>
-            );
-          })}
+              return (
+                <span
+                  key={occ.id}
+                  className={cn(
+                    "transition-colors",
+                    !isInActiveGroup && "cursor-pointer",
+                    isInActiveGroup && "bg-sky-200 rounded px-0.5",
+                    approved && !isInActiveGroup && "text-emerald-700",
+                    !approved && !isInActiveGroup && "text-muted-foreground",
+                  )}
+                  onClick={() => groupIndex !== -1 && fadeToGroup(groupIndex)}
+                >
+                  {occ.surfaceText}
+                  {!isLastToken && !isPunct && !nextIsPunct && " "}
+                  {!isLastToken && isPunct && " "}
+                </span>
+              );
+            }),
+          )}
         </p>
       </div>
     </div>

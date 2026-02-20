@@ -3,6 +3,10 @@
     "git": {
       "command": "uvx",
       "args": ["mcp-server-git", "--repository", "${workspaceFolder}"]
+    },
+    "playwright": {
+      "command": "npx",
+      "args": ["@playwright/mcp@latest"]
     }
   }
 }
