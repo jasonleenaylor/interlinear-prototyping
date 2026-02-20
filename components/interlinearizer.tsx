@@ -8,7 +8,7 @@ import { RowOrderSettings } from "@/components/row-order-settings";
 import { useRowOrder } from "@/hooks/use-row-order";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Settings2, SlidersHorizontal, Link2 } from "lucide-react";
+import { Settings2, SlidersHorizontal, Link2, Copy } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { OccurrenceType } from "@/lib/interlinear-model";
 import { useTextConfig } from "@/hooks/use-text-config";
@@ -35,6 +35,7 @@ export function Interlinearizer() {
     segmentTranslations,
     updateLiteralTranslation,
     updateFreeTranslation,
+    copyGlossesToLiteral,
     mergeSegments,
     moveForward,
     moveBackward,
@@ -419,14 +420,25 @@ export function Interlinearizer() {
                   </p>
                 </div>
                 {textConfig.showLiteral && (
-                  <Textarea
-                    className="mt-1 text-xs min-h-0 h-8 py-1 resize-none font-mono"
-                    placeholder="Literal…"
-                    value={segmentTranslations[seg.id]?.literal ?? ""}
-                    onChange={(e) =>
-                      updateLiteralTranslation(seg.id, e.target.value)
-                    }
-                  />
+                  <div className="mt-1 flex items-center gap-1">
+                    <Textarea
+                      className="text-xs min-h-0 h-8 py-1 resize-none font-mono"
+                      placeholder="Literal…"
+                      value={segmentTranslations[seg.id]?.literal ?? ""}
+                      onChange={(e) =>
+                        updateLiteralTranslation(seg.id, e.target.value)
+                      }
+                    />
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label="Copy glosses into literal translation"
+                      onClick={() => copyGlossesToLiteral(seg.id)}
+                      className="shrink-0 text-muted-foreground hover:text-foreground"
+                    >
+                      <Copy className="size-3.5" />
+                    </Button>
+                  </div>
                 )}
                 {textConfig.showFree && (
                   <Textarea

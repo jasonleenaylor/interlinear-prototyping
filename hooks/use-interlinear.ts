@@ -241,6 +241,28 @@ export function useInterlinear() {
     [],
   );
 
+  /** Copy segment glosses into the segment's literal translation field. */
+  const copyGlossesToLiteral = useCallback(
+    (segmentId: string) => {
+      const seg = segments.find((s) => s.id === segmentId);
+      if (!seg) return;
+
+      const byId = new Map(occurrences.map((o) => [o.id, o]));
+      const literal = seg.occurrences
+        .map((occ) => byId.get(occ.id))
+        .filter((occ): occ is Occurrence => !!occ && !occ.isPunctuation)
+        .map((occ) => occ.gloss.trim())
+        .filter(Boolean)
+        .join(" ");
+
+      setSegmentTranslations((prev) => ({
+        ...prev,
+        [segmentId]: { ...prev[segmentId], literal },
+      }));
+    },
+    [segments, occurrences],
+  );
+
   /** Merge two adjacent segments into one. No-op if either is already merged. */
   const mergeSegments = useCallback((segId1: string, segId2: string) => {
     setSegments((prev) => {
@@ -290,6 +312,7 @@ export function useInterlinear() {
     segmentTranslations,
     updateLiteralTranslation,
     updateFreeTranslation,
+    copyGlossesToLiteral,
     mergeSegments,
     moveForward,
     moveBackward,
