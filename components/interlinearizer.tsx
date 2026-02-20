@@ -84,26 +84,16 @@ export function Interlinearizer() {
 
   return (
     <div className="flex flex-col gap-4 w-full">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-lg font-semibold text-foreground">
-            Interlinearizer
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            Occurrence {activeGroupIndex + 1} of {linkedGroups.length}
-          </p>
-        </div>
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <span className="flex items-center gap-1.5">
-            <span className="inline-block size-3 rounded border border-sky-200 bg-sky-50" />
-            Unapproved
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="inline-block size-3 rounded border border-muted-foreground/20 bg-white" />
-            Approved
-          </span>
-        </div>
+      {/* Legend */}
+      <div className="flex items-center justify-end gap-2 text-xs text-muted-foreground">
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block size-3 rounded border border-sky-200 bg-sky-50" />
+          Unapproved
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block size-3 rounded border border-muted-foreground/20 bg-white" />
+          Approved
+        </span>
       </div>
 
       {/* Fixed-frame scrolling container */}
