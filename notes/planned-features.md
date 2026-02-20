@@ -131,7 +131,7 @@ The text is visually seamless when translation inputs are hidden.
 
 ## F-06 · Link adjacent verse segments
 
-**Status:** done (awaiting manual verification before commit)
+**Status:** done — committed
 
 ### UI
 The link icon appears **between segment blocks** in the text area — below the last
@@ -182,7 +182,7 @@ Do **not** add `linkedSegmentRefs`.
 
 ## F-07 · Contiguous text flow when no translation lines are shown
 
-**Status:** pending
+**Status:** done — committed
 
 When both **Show literal translation** and **Show free translation** are disabled, the
 segment-by-segment `<div>` blocks introduced in F-05 leave a small visual gap between
