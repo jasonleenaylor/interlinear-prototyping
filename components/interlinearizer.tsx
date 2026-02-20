@@ -4,6 +4,10 @@ import { useRef, useEffect, useMemo, useState, useCallback } from "react";
 import { useInterlinear } from "@/hooks/use-interlinear";
 import { OccurrenceBox } from "@/components/occurrence-box";
 import { LinkButton } from "@/components/link-button";
+import { RowOrderSettings } from "@/components/row-order-settings";
+import { useRowOrder } from "@/hooks/use-row-order";
+import { Button } from "@/components/ui/button";
+import { Settings2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**
@@ -33,6 +37,7 @@ export function Interlinearizer() {
     canGoForward,
   } = useInterlinear();
 
+  const rowOrder = useRowOrder();
   const stripRef = useRef<HTMLDivElement>(null);
   const groupRefs = useRef<Map<number, HTMLDivElement>>(new Map());
 
@@ -96,18 +101,32 @@ export function Interlinearizer() {
         </span>
       </div>
 
-      {/* Fixed-frame scrolling container */}
-      <div
-        className="overflow-hidden relative"
-        role="region"
-        aria-label="Scripture interlinear view"
-      >
-        {/* Translating strip */}
-        <div
-          ref={stripRef}
-          className="flex items-start gap-0 w-max py-1 transition-transform duration-300 ease-in-out"
-          style={{ transform: `translateX(${translateX}px)` }}
+      {/* Settings button row */}
+      <div className="flex items-center">
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          onClick={rowOrder.open}
+          aria-label="Row order settings"
+          className="text-muted-foreground hover:text-foreground"
         >
+          <Settings2 className="size-4" />
+        </Button>
+      </div>
+
+      {/* Strip + optional settings panel side-by-side */}
+      <div className="flex items-start gap-2">
+        <div
+          className="overflow-hidden relative flex-1"
+          role="region"
+          aria-label="Scripture interlinear view"
+        >
+          {/* Translating strip */}
+          <div
+            ref={stripRef}
+            className="flex items-start gap-0 w-max py-1 transition-transform duration-300 ease-in-out"
+            style={{ transform: `translateX(${translateX}px)` }}
+          >
           {renderItems.map((item) => {
             if (item.type === "group") {
               const gi = item.groupIndex;
@@ -133,6 +152,7 @@ export function Interlinearizer() {
                   <OccurrenceBox
                     group={group}
                     isActive={isActive}
+                    rowOrder={rowOrder.activeOrder}
                     onApprove={toggleApprove}
                     onForward={moveForward}
                     onBackward={moveBackward}
@@ -159,7 +179,18 @@ export function Interlinearizer() {
               </div>
             );
           })}
+          </div>
         </div>
+
+        {/* Settings panel */}
+        {rowOrder.isOpen && (
+          <RowOrderSettings
+            order={rowOrder.draftOrder!}
+            onMove={rowOrder.moveDraft}
+            onSave={rowOrder.save}
+            onCancel={rowOrder.cancel}
+          />
+        )}
       </div>
 
       {/* Full text preview */}

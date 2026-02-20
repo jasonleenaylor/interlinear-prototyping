@@ -6,10 +6,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { ChevronLeft, ChevronRight, Check, Unlink2 } from "lucide-react";
+import type { RowId } from "@/hooks/use-row-order";
 
 interface OccurrenceBoxProps {
   group: LinkedGroup;
   isActive: boolean;
+  rowOrder: RowId[];
   onApprove: () => void;
   onForward: () => void;
   onBackward: () => void;
@@ -23,6 +25,7 @@ interface OccurrenceBoxProps {
 export function OccurrenceBox({
   group,
   isActive,
+  rowOrder,
   onApprove,
   onForward,
   onBackward,
@@ -79,49 +82,58 @@ export function OccurrenceBox({
         ))}
       </div>
 
-      {/* Gloss input - single for the entire group */}
-      <div className="px-2 py-1 border-t border-muted-foreground/15">
-        {isActive ? (
-          <Input
-            value={gloss}
-            onChange={(e) => onUpdateGloss(group.startIndex, e.target.value)}
-            placeholder="gloss"
-            className="h-7 text-sm font-mono bg-white border-muted-foreground/20 text-center"
-            autoFocus
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                onApprove();
-              }
-            }}
-          />
-        ) : (
-          <div className="h-7 flex items-center justify-center text-sm font-mono text-muted-foreground">
-            {gloss || "\u00A0"}
-          </div>
-        )}
-      </div>
-
-      {/* Morpheme editors - one per occurrence in the group */}
-      <div className="flex border-t border-muted-foreground/15">
-        {group.occurrences.map((occ, i) => (
-          <div
-            key={`morph-${occ.id}`}
-            className={cn(
-              "px-1.5 py-1.5 flex-1 min-w-0",
-              i < group.occurrences.length - 1 &&
-                "border-r border-dashed border-muted-foreground/30",
-            )}
-          >
-            <MorphemeEditor
-              morphemeText={occ.morphemeText}
-              isActive={isActive}
-              onChange={(newText) =>
-                onUpdateMorphemeText(group.startIndex + i, newText)
-              }
-            />
-          </div>
-        ))}
-      </div>
+      {/* Analysis rows rendered in user-defined order */}
+      {rowOrder.map((rowId) => {
+        if (rowId === "gloss") {
+          return (
+            <div key="gloss" className="px-2 py-1 border-t border-muted-foreground/15">
+              {isActive ? (
+                <Input
+                  value={gloss}
+                  onChange={(e) => onUpdateGloss(group.startIndex, e.target.value)}
+                  placeholder="gloss"
+                  className="h-7 text-sm font-mono bg-white border-muted-foreground/20 text-center"
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      onApprove();
+                    }
+                  }}
+                />
+              ) : (
+                <div className="h-7 flex items-center justify-center text-sm font-mono text-muted-foreground">
+                  {gloss || "\u00A0"}
+                </div>
+              )}
+            </div>
+          );
+        }
+        if (rowId === "morphemes") {
+          return (
+            <div key="morphemes" className="flex border-t border-muted-foreground/15">
+              {group.occurrences.map((occ, i) => (
+                <div
+                  key={`morph-${occ.id}`}
+                  className={cn(
+                    "px-1.5 py-1.5 flex-1 min-w-0",
+                    i < group.occurrences.length - 1 &&
+                      "border-r border-dashed border-muted-foreground/30",
+                  )}
+                >
+                  <MorphemeEditor
+                    morphemeText={occ.morphemeText}
+                    isActive={isActive}
+                    onChange={(newText) =>
+                      onUpdateMorphemeText(group.startIndex + i, newText)
+                    }
+                  />
+                </div>
+              ))}
+            </div>
+          );
+        }
+        return null;
+      })}
 
       {/* Action buttons - only shown on active occurrence */}
       {isActive && (
