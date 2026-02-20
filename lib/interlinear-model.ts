@@ -1,8 +1,29 @@
 /**
- * Interlinearizer Interlinear Model
+ * Interlinearizer Interlinear Model — App copy
  *
- * A representation for interlinear data that should cover import from LCM (FieldWorks),
- * Paratext 9, and BT Extension and support the new interlinearizer
+ * ╔══════════════════════════════════════════════════════════════════╗
+ * ║  THIS FILE IS A COPY OF  results/interlinear-model.ts          ║
+ * ║                                                                ║
+ * ║  The canonical source of truth lives in:                       ║
+ * ║    results/interlinear-model.ts                                ║
+ * ║                                                                ║
+ * ║  The authoritative documentation lives in:                     ║
+ * ║    interlinear-model-analyses/unified-model-proposal.md        ║
+ * ║                                                                ║
+ * ║  SYNC INSTRUCTIONS (for humans and AI agents):                 ║
+ * ║  1. All model changes MUST be made in results/interlinear-     ║
+ * ║     model.ts first.                                            ║
+ * ║  2. After changing the canonical file, copy the full content   ║
+ * ║     into this file (lib/interlinear-model.ts), preserving      ║
+ * ║     only this header comment block.                            ║
+ * ║  3. Update the proposal doc (unified-model-proposal.md) to    ║
+ * ║     reflect any structural changes.                            ║
+ * ║  4. Update sample data (lib/sample-data.ts) if new required   ║
+ * ║     fields were added or existing shapes changed.              ║
+ * ║  5. Never edit this file without first editing the canonical   ║
+ * ║     source — the two must always be identical (minus this      ║
+ * ║     header).                                                   ║
+ * ╚══════════════════════════════════════════════════════════════════╝
  */
 
 // ---------------------------------------------------------------------------

@@ -1,0 +1,182 @@
+"use client";
+
+import { useState, useCallback, useRef, useEffect } from "react";
+import { type Occurrence, buildLinkedGroups } from "@/lib/interlinear-types";
+import { sampleInterlinearization, sampleAnalyses } from "@/lib/sample-data";
+import { adaptToUiOccurrences } from "@/lib/adapt-sample-data";
+
+/** Build initial UI occurrences from the canonical sample data (all verses). */
+function buildInitialOccurrences(): Occurrence[] {
+  return adaptToUiOccurrences(sampleInterlinearization, sampleAnalyses, {
+    allSegments: true,
+  });
+}
+
+export function useInterlinear() {
+  const [occurrences, setOccurrences] = useState<Occurrence[]>(
+    buildInitialOccurrences,
+  );
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  const linkedGroups = buildLinkedGroups(occurrences);
+
+  // Keep a ref to linkedGroups to avoid stale closures
+  const linkedGroupsRef = useRef(linkedGroups);
+  useEffect(() => {
+    linkedGroupsRef.current = linkedGroups;
+  }, [linkedGroups]);
+
+  // Find which group the active index belongs to
+  const activeGroupIndex = linkedGroups.findIndex(
+    (g) =>
+      activeIndex >= g.startIndex &&
+      activeIndex < g.startIndex + g.occurrences.length,
+  );
+
+  const moveForward = useCallback(() => {
+    setActiveIndex((prev) => {
+      const groups = linkedGroupsRef.current;
+      const currentGroupIdx = groups.findIndex(
+        (g) =>
+          prev >= g.startIndex && prev < g.startIndex + g.occurrences.length,
+      );
+      if (currentGroupIdx < groups.length - 1) {
+        return groups[currentGroupIdx + 1].startIndex;
+      }
+      return prev;
+    });
+  }, []);
+
+  const moveBackward = useCallback(() => {
+    setActiveIndex((prev) => {
+      const groups = linkedGroupsRef.current;
+      const currentGroupIdx = groups.findIndex(
+        (g) =>
+          prev >= g.startIndex && prev < g.startIndex + g.occurrences.length,
+      );
+      if (currentGroupIdx > 0) {
+        return groups[currentGroupIdx - 1].startIndex;
+      }
+      return prev;
+    });
+  }, []);
+
+  const toggleApprove = useCallback(() => {
+    const group = linkedGroupsRef.current[activeGroupIndex];
+    if (!group) return;
+
+    const allApproved = group.occurrences.every((o) => o.approved);
+    const newStatus = !allApproved;
+
+    setOccurrences((prev) => {
+      const next = [...prev];
+      for (
+        let i = group.startIndex;
+        i < group.startIndex + group.occurrences.length;
+        i++
+      ) {
+        next[i] = { ...next[i], approved: newStatus };
+      }
+      return next;
+    });
+
+    // Auto-advance only when approving, not when unapproving
+    if (newStatus) {
+      moveForward();
+    }
+  }, [activeGroupIndex, moveForward]);
+
+  const updateGloss = useCallback((groupStartIndex: number, gloss: string) => {
+    // For a linked group, we store the gloss on the first occurrence
+    setOccurrences((prev) => {
+      const next = [...prev];
+      next[groupStartIndex] = { ...next[groupStartIndex], gloss };
+      return next;
+    });
+  }, []);
+
+  const updateMorphemeText = useCallback(
+    (occIndex: number, morphemeText: string) => {
+      setOccurrences((prev) => {
+        const next = [...prev];
+        next[occIndex] = { ...next[occIndex], morphemeText };
+        return next;
+      });
+    },
+    [],
+  );
+
+  const toggleLink = useCallback(
+    (occIndex: number) => {
+      setOccurrences((prev) => {
+        const next = [...prev];
+
+        // If already linked here, just unlink (simple toggle)
+        if (next[occIndex].linkedWithNext) {
+          next[occIndex] = { ...next[occIndex], linkedWithNext: false };
+          return next;
+        }
+
+        // The link sits between occIndex and occIndex+1.
+        // Determine which side faces the active group so we know
+        // which neighbour to merge into the active group.
+        const groups = linkedGroupsRef.current;
+        const activeGroup = groups[activeGroupIndex];
+        if (!activeGroup) {
+          // Fallback: simple adjacent link
+          next[occIndex] = { ...next[occIndex], linkedWithNext: true };
+          return next;
+        }
+
+        const activeEnd =
+          activeGroup.startIndex + activeGroup.occurrences.length - 1;
+
+        // Adjacent link — just set the flag
+        if (occIndex === activeEnd || occIndex + 1 === activeGroup.startIndex) {
+          next[occIndex] = { ...next[occIndex], linkedWithNext: true };
+          return next;
+        }
+
+        // Non-contiguous: link the neighbour on the active-group side
+        // into the active group by bridging all occurrences in between.
+        if (occIndex > activeEnd) {
+          // Link is to the right of the active group.
+          // Bridge from activeEnd through occIndex.
+          for (let i = activeEnd; i <= occIndex; i++) {
+            next[i] = { ...next[i], linkedWithNext: true };
+          }
+        } else if (occIndex + 1 < activeGroup.startIndex) {
+          // Link is to the left of the active group.
+          // Bridge from occIndex through activeGroup.startIndex - 1.
+          for (let i = occIndex; i < activeGroup.startIndex; i++) {
+            next[i] = { ...next[i], linkedWithNext: true };
+          }
+        } else {
+          // Inside the active group — simple toggle
+          next[occIndex] = { ...next[occIndex], linkedWithNext: true };
+        }
+
+        return next;
+      });
+    },
+    [activeGroupIndex],
+  );
+
+  const canGoBack = activeGroupIndex > 0;
+  const canGoForward = activeGroupIndex < linkedGroups.length - 1;
+
+  return {
+    occurrences,
+    activeIndex,
+    activeGroupIndex,
+    linkedGroups,
+    moveForward,
+    moveBackward,
+    toggleApprove,
+    updateGloss,
+    updateMorphemeText,
+    toggleLink,
+    canGoBack,
+    canGoForward,
+  };
+}

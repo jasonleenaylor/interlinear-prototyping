@@ -1,0 +1,8 @@
+{
+    "chat.tools.terminal.autoApprove": {
+        "/^C:/Repositories/interlinear-research/\\.venv/Scripts/python\\.exe c:/Repositories/interlinear-research/scripts/analyze_interlinear\\.py --input \"c:/Repositories/interlinear-research/projects-with-interlinear-2026-02-06\\.json\" --output c:/Repositories/interlinear-research/results/summary\\.json$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
+    }
+}

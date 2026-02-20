@@ -15,22 +15,22 @@ The interlinear model does **not** attempt to round‑trip LCM's `IWfiWordform`,
 
 ## 1. Interlinear Model
 
-### 1.1 Interlinear
+### 1.1 Interlinearization
 
-The top-level container for all interlinear data. An Interlinear holds the set of analysis languages and the collection of analyzed books.
+The top-level container for all interlinear data. An Interlinearization holds the set of analysis languages and the collection of analyzed books.
 
 | Property | Type | Description |
 |---|---|---|
-| `interlinearId` | string | Unique identifier. |
+| `id` | string | Unique identifier. |
 | `sourceWritingSystem` | string | Writing system of the source text being analyzed. |
-| `analysisLanguages[]` | string | Writing systems in which analyses are provided (e.g. `en`, `fr`). A single interlinear can hold analyses in multiple languages. |
+| `analysisLanguages[]` | string | Writing systems in which analyses are provided (e.g. `en`, `fr`). A single interlinearization can hold analyses in multiple languages. |
 | `books[]` | AnalyzedBook | The books of scripture (or other texts) that have been analyzed. |
 
 **Source-system mapping:**
 
-- **LCM:** One `Interlinear` corresponds to one `IScripture` instance — the singleton scripture container in a FieldWorks project. `sourceWritingSystem` is the project's vernacular writing system. LCM supports analyses in many languages simultaneously; each analysis language appears in `analysisLanguages[]`.
-- **Paratext:** Multiple `InterlinearData` files contribute to one `Interlinear`. Paratext creates a separate file per analysis language per book (`Interlinear_{language}/Interlinear_{language}_{book}.xml`). During import, all language files for the same source text are merged into one `Interlinear`, with each file's gloss language added to `analysisLanguages[]`.
-- **BT Extension:** One `Interlinear` corresponds to a `Translation` (project scope). Analysis is typically in a single language; `analysisLanguages[]` contains that language.
+- **LCM:** One `Interlinearization` corresponds to one `IScripture` instance — the singleton scripture container in a FieldWorks project. `sourceWritingSystem` is the project's vernacular writing system. LCM supports analyses in many languages simultaneously; each analysis language appears in `analysisLanguages[]`.
+- **Paratext:** Multiple `InterlinearData` files contribute to one `Interlinearization`. Paratext creates a separate file per analysis language per book (`Interlinear_{language}/Interlinear_{language}_{book}.xml`). During import, all language files for the same source text are merged into one `Interlinearization`, with each file's gloss language added to `analysisLanguages[]`.
+- **BT Extension:** One `Interlinearization` corresponds to a `Translation` (project scope). Analysis is typically in a single language; `analysisLanguages[]` contains that language.
 
 ---
 
@@ -40,7 +40,7 @@ Represents one book of scripture (or other text unit) that has been analyzed wit
 
 | Property | Type | Description |
 |---|---|---|
-| `analyzedBookId` | string | Unique identifier. |
+| `id` | string | Unique identifier. |
 | `bookRef` | string | Book identifier (e.g. `GEN`, `MAT`, or a text name). |
 | `textVersion` | string | Hash or version stamp of the source text at the time of analysis. Used to detect when the underlying text has changed and analyses may be stale. |
 | `segments[]` | Segment | Ordered segments that compose this book. |
@@ -59,7 +59,7 @@ A segment is a sentence, clause, or verse — the unit within which occurrences 
 
 | Property | Type | Description |
 |---|---|---|
-| `segmentId` | string | Unique identifier. |
+| `id` | string | Unique identifier. |
 | `segmentRef` | string | Canonical reference (e.g. verse reference, paragraph index + offset range). |
 | `baselineText` | string (optional) | The raw text of the segment, for display and validation. |
 | `freeTranslation` | MultiString (optional) | Idiomatic translation of the segment. |
@@ -80,7 +80,7 @@ An occurrence is a single word or punctuation token at a specific position in th
 
 | Property | Type | Description |
 |---|---|---|
-| `occurrenceId` | string | Unique identifier. |
+| `id` | string | Unique identifier. |
 | `segmentId` | string | Parent segment. |
 | `index` | int | Zero-based position within the segment (preserves word order). |
 | `anchor` | string | Positional anchor in the source text. Supports BCVWP, BCVWP+partNum, StringRange, or character offset depending on source system. |
@@ -103,11 +103,12 @@ A reusable analysis describing a linguistic interpretation of a word. The same a
 
 | Property | Type | Description |
 |---|---|---|
-| `analysisId` | string | Unique identifier. |
+| `id` | string | Unique identifier. |
 | `analysisLanguage` | string | Writing system of the analysis (e.g. the gloss language). |
 | `analysisType` | enum | `wordform` · `morph` · `gloss` · `punctuation` |
 | `confidence` | enum | `guess` · `low` · `medium` · `high`. Describes how the analysis was produced. `high` = human-created or human-confirmed. `medium`/`low` = AI or tool-assisted with varying certainty. `guess` = unreviewed machine suggestion. |
-| `origin` | string | Provenance of the analysis, combining system and creator. Format: `system:creator` (e.g. `lcm:parser-v3`, `paratext:jsmith`, `bt-extension:eflomal`, `ai:gpt-4`). |
+| `sourceSystem` | string | System that produced the analysis (e.g. `lcm`, `paratext`, `bt-extension`, `ai`). |
+| `sourceUser` | string | User/agent identifier within that system (e.g. `parser-v3`, `jsmith`, `auto-glosser`). |
 | `glossText` | string (optional) | Word-level gloss text. |
 | `pos` | string (optional) | Part of speech. |
 | `features` | object (optional) | Morphosyntactic feature structure. |
@@ -115,9 +116,9 @@ A reusable analysis describing a linguistic interpretation of a word. The same a
 
 **Source-system mapping:**
 
-- **LCM:** An `IWfiAnalysis` maps to an Analysis with `analysisType = morph` and `morphemeBundles` populated from `MorphBundlesOS`. An `IWfiGloss` maps to an Analysis with `analysisType = gloss` and `glossText` from `IWfiGloss.Form`. An `IWfiWordform` with no analyses maps to `analysisType = wordform`. `pos` comes from `IWfiAnalysis.CategoryRA`. `features` from `IWfiAnalysis.MsFeaturesOA`. Human-approved analyses get `confidence = high`, `origin = lcm:human`. Parser-generated analyses get `confidence = guess` or `low` based on `ICmAgentEvaluation`, `origin = lcm:parser-v3`.
-- **Paratext:** A `LexemeCluster` with its `WordAnalysis` maps to an Analysis. If `LexemeCluster.Type = WordParse`, `analysisType = morph` and each `Lexeme` in the `WordAnalysis` becomes a `MorphemeBundle`. If `Type = Word`, `analysisType = wordform` or `gloss` depending on whether a gloss selection exists. `glossText` is resolved from the selected `LexiconSense` gloss. Human selections get `confidence = high`, `origin = paratext:<user>`. Auto-glossed entries with `IsGuess = true` get `confidence = guess`, `origin = paratext:auto-glosser`. `InterlinearLexeme.Score` can distinguish `low` vs `medium`.
-- **BT Extension:** A `Token` with `gloss`/`lemmaText`/`senseIds` populated maps to an Analysis with `analysisType = gloss`. `glossText` = `Token.gloss`. `pos` from Macula TSV `pos` field when available. BT Extension does not produce morpheme-level analyses; `morphemeBundles` would be empty. BT Extension has no analysis-level confidence field; `confidence` must be inferred heuristically — e.g. if `Instance.termStatusNum = APPROVED (1)` or `OVERRIDDEN (3)`, infer `confidence = high`; if `termStatusNum = NEEDS_REVIEW (0)`, infer `confidence = guess`. `origin = bt-extension:human` for manually entered glosses. Note: eflomal produces **Alignment** records (§1.8), not analyses — it never populates gloss, lemma, or sense data on tokens. Because BT Extension stores gloss/sense data per-token (not as shared analysis objects), migration must deduplicate tokens with identical gloss+lemma+senseIds into a single reusable Analysis.
+- **LCM:** An `IWfiAnalysis` maps to an Analysis with `analysisType = morph` and `morphemeBundles` populated from `MorphBundlesOS`. An `IWfiGloss` maps to an Analysis with `analysisType = gloss` and `glossText` from `IWfiGloss.Form`. An `IWfiWordform` with no analyses maps to `analysisType = wordform`. `pos` comes from `IWfiAnalysis.CategoryRA`. `features` from `IWfiAnalysis.MsFeaturesOA`. Human-approved analyses get `confidence = high`, `sourceSystem = "lcm"`, `sourceUser = "human"`. Parser-generated analyses get `confidence = guess` or `low` based on `ICmAgentEvaluation`, `sourceSystem = "lcm"`, `sourceUser = "parser-v3"`.
+- **Paratext:** A `LexemeCluster` with its `WordAnalysis` maps to an Analysis. If `LexemeCluster.Type = WordParse`, `analysisType = morph` and each `Lexeme` in the `WordAnalysis` becomes a `MorphemeBundle`. If `Type = Word`, `analysisType = wordform` or `gloss` depending on whether a gloss selection exists. `glossText` is resolved from the selected `LexiconSense` gloss. Human selections get `confidence = high`, `sourceSystem = "paratext"`, `sourceUser = <user>`. Auto-glossed entries with `IsGuess = true` get `confidence = guess`, `sourceSystem = "paratext"`, `sourceUser = "auto-glosser"`. `InterlinearLexeme.Score` can distinguish `low` vs `medium`.
+- **BT Extension:** A `Token` with `gloss`/`lemmaText`/`senseIds` populated maps to an Analysis with `analysisType = gloss`. `glossText` = `Token.gloss`. `pos` from Macula TSV `pos` field when available. BT Extension does not produce morpheme-level analyses; `morphemeBundles` would be empty. BT Extension has no analysis-level confidence field; `confidence` must be inferred heuristically — e.g. if `Instance.termStatusNum = APPROVED (1)` or `OVERRIDDEN (3)`, infer `confidence = high`; if `termStatusNum = NEEDS_REVIEW (0)`, infer `confidence = guess`. Manually entered glosses set `sourceSystem = "bt-extension"`, `sourceUser = "human"`; automated imports should use a stable automation identifier. Note: eflomal produces **Alignment** records (§1.8), not analyses — it never populates gloss, lemma, or sense data on tokens. Because BT Extension stores gloss/sense data per-token (not as shared analysis objects), migration must deduplicate tokens with identical gloss+lemma+senseIds into a single reusable Analysis.
 
 ---
 
@@ -125,19 +126,22 @@ A reusable analysis describing a linguistic interpretation of a word. The same a
 
 The join between an occurrence and an analysis. Multiple assignments per occurrence enable competing analyses. The `status` field indicates whether the assignment has been approved by a human or is still a suggestion.
 
+**Phrase grouping via `groupId`:** When two or more occurrences are glossed or analyzed as a single unit (a phrase, a discontinuous expression, etc.) each occurrence carries its own AnalysisAssignment but all such assignments share the same `groupId` and reference the same Analysis. Grouped occurrences may be adjacent within one segment ("en el" → "in the"), disjoint within one segment (French "ne … pas" → "not"), or spanning multiple segments. A single-word assignment omits `groupId`.
+
 | Property | Type | Description |
 |---|---|---|
-| `assignmentId` | string | Unique identifier. |
+| `id` | string | Unique identifier. |
 | `occurrenceId` | string | The occurrence being analyzed. |
 | `analysisId` | string | The analysis applied. |
-| `status` | enum | `approved` · `suggested`. Whether a human has confirmed this analysis for this occurrence. |
+| `status` | enum | `approved` · `suggested` · `candidate` · `rejected`. Lifecycle status of this assignment. |
+| `groupId` | string (optional) | Shared identifier linking assignments that form a multi-occurrence phrase group. Assignments with the same `groupId` reference the same Analysis and are treated as one annotation unit. Grouped occurrences need not be adjacent and may reside in different segments. When absent, the assignment is a normal single-word assignment. |
 | `createdAt` | datetime (optional) | Timestamp of when the assignment was made. |
 
 **Source-system mapping:**
 
-- **LCM:** When `ISegment.AnalysesRS[i]` directly references an `IWfiGloss` or `IWfiAnalysis`, this creates an assignment with `status = approved` (the user selected this analysis for this position). Parser-suggested analyses that have not been confirmed by a user create assignments with `status = suggested`.
-- **Paratext:** A `ClusterData` with selected `LexemeData` (lexemeId + senseId) creates an assignment. If `InterlinearLexeme.IsGuess = false`, `status = approved`. If `IsGuess = true`, `status = suggested`.
-- **BT Extension:** A `Token` linked to senses (`senseIds`) creates an assignment. `termStatusNum` is a per-`Instance` property mapped to `BiblicalTermStatus` (NEEDS_REVIEW=0, APPROVED=1, REJECTED=2, OVERRIDDEN=3). If `termStatusNum = APPROVED (1)` or `OVERRIDDEN (3)`, `status = approved`. If `termStatusNum = NEEDS_REVIEW (0)`, `status = suggested`. Note: `termStatusNum` applies to the entire Instance, not to individual sense links — if a token is linked to multiple senses via the `instance_sense_xref` join table, all links share the same status. BT Extension does not distinguish how a sense link was created (manual vs. automatic); only the review state is tracked.
+- **LCM:** When `ISegment.AnalysesRS[i]` directly references an `IWfiGloss` or `IWfiAnalysis`, this creates an assignment with `status = approved` (the user selected this analysis for this position). Parser-suggested analyses that have not been confirmed by a user create assignments with `status = suggested`. LCM does not natively model multi-word phrases; `groupId` is absent.
+- **Paratext:** A `ClusterData` with selected `LexemeData` (lexemeId + senseId) creates an assignment. If `InterlinearLexeme.IsGuess = false`, `status = approved`. If `IsGuess = true`, `status = suggested`. Paratext's `Phrase` cluster type spans multiple words — each word's assignment shares the same `groupId`.
+- **BT Extension:** A `Token` linked to senses (`senseIds`) creates an assignment. `termStatusNum` is a per-`Instance` property mapped to `BiblicalTermStatus` (NEEDS_REVIEW=0, APPROVED=1, REJECTED=2, OVERRIDDEN=3). If `termStatusNum = APPROVED (1)` or `OVERRIDDEN (3)`, `status = approved`. If `termStatusNum = NEEDS_REVIEW (0)`, `status = suggested`. `groupId` is not natively tracked; it must be synthesized during migration when adjacent tokens share the same gloss/sense.
 
 ---
 
@@ -147,7 +151,7 @@ An ordered morpheme within a morpheme-level analysis, linking to the lexicon.
 
 | Property | Type | Description |
 |---|---|---|
-| `bundleId` | string | Unique identifier. |
+| `id` | string | Unique identifier. |
 | `index` | int | Zero-based position within the analysis (preserves morpheme order). |
 | `form` | string | The morpheme form as it appears in this analysis (surface text). |
 | `writingSystem` | string | Writing system of `form`. |
@@ -166,64 +170,120 @@ An ordered morpheme within a morpheme-level analysis, linking to the lexicon.
 
 ---
 
-### 1.8 Alignment
+### 1.8 InterlinearAlignment
 
-Links occurrences across translations (source ↔ target).
+A project pairing a source-language interlinearization and a target-language interlinearization with morph-level alignment links between them. Both interlinearizations carry their own analyzed books, segments, occurrences, and analyses. AlignmentLinks bridge the two, connecting individual morphemes (MorphemeBundles) or whole unanalyzed words (Occurrences) across the language boundary.
 
 | Property | Type | Description |
 |---|---|---|
-| `alignmentId` | string | Unique identifier. |
-| `sourceOccurrences[]` | string | Occurrence IDs on the source side. |
-| `targetOccurrences[]` | string | Occurrence IDs on the target side. |
-| `origin` | string (optional) | How the alignment was created (manual, automatic, etc.). |
-| `status` | enum | `approved` · `candidate` · `rejected` |
+| `id` | string | Unique identifier. |
+| `source` | Interlinearization | The source-language interlinearization (e.g. Greek / Hebrew). |
+| `target` | Interlinearization | The target-language interlinearization (e.g. vernacular translation). |
+| `links[]` | AlignmentLink | Morph-level alignment links connecting endpoints in the source interlinear to endpoints in the target interlinear. |
+
+**Source-system mapping:**
+
+- **LCM:** LCM has no native alignment or bilingual pairing model. An InterlinearAlignment is constructed by pairing a Scripture-based Interlinearization (vernacular) with a source-text Interlinearization produced externally (e.g. Greek/Hebrew resource text).
+- **Paratext:** Not directly represented. Can be constructed from parallel projects that share the same versification.
+- **BT Extension:** One `Translation` scoped to source + target sides (`Translation.sideNum`: 1 = source, 2 = target). Each side becomes an `Interlinearization`. `Alignment` records become `AlignmentLink`s.
+
+---
+
+### 1.9 AlignmentLink
+
+A directional alignment link from one or more source-text morphemes/words to one or more target-text morphemes/words.  Each endpoint resolves to either a specific MorphemeBundle within a fully analyzed occurrence (connecting at the allomorph level) or a whole unanalyzed occurrence.
+
+Typical workflow: the user selects a morph from the source-text interlinear and connects it to an allomorph of a fully analyzed occurrence in the target-text interlinear — or to an unanalyzed occurrence if the target word has not yet been broken into morphemes.
+
+| Property | Type | Description |
+|---|---|---|
+| `linkId` | string | Unique identifier. |
+| `sourceEndpoints[]` | AlignmentEndpoint | Source-side endpoints (one or more morphemes / words from the source interlinear). |
+| `targetEndpoints[]` | AlignmentEndpoint | Target-side endpoints (one or more morphemes / words from the target interlinear). |
+| `status` | enum | `approved` · `suggested` · `candidate` · `rejected` |
+| `origin` | string (optional) | How the alignment was created (manual, automatic tool, etc.). |
+| `confidence` | enum (optional) | `guess` · `low` · `medium` · `high`. Independent of the confidence on the analyses at each endpoint. |
 | `notes` | string (optional) | Free-text annotation. |
 
 **Source-system mapping:**
 
-- **LCM:** LCM does not have a native alignment model between translations. Alignments would only be present if an external tool produced them.
-- **Paratext:** Paratext does not store bilingual alignment in its interlinear model. Alignments can be derived from parallel interlinear selections when two translations share the same project.
-- **BT Extension:** `Alignment` entity maps directly. `sourceOccurrences` and `targetOccurrences` from the alignment's source/target instance lists (`sourceInstances: Instance[]` / `targetInstances: Instance[]` via join tables in DB; `sources: number[]` / `targets: number[]` in API). `notes` = `Alignment.notesText`. `status` from `Alignment.statusNum` mapped via `AlignmentStatus` enum (CREATED=0, REJECTED=1, APPROVED=2, NEEDS_REVIEW=3). This is a lossy mapping: `APPROVED (2)` → `approved`, `REJECTED (1)` → `rejected`, and both `CREATED (0)` and `NEEDS_REVIEW (3)` collapse to `candidate` (the unified model has no equivalent for BT Extension's distinction between a newly created alignment and one flagged for review). `origin` from `Alignment.originNum` — an integer defaulting to 0 with **no `AlignmentOrigin` enum** in the codebase; the mapping from numeric values to descriptive origin strings must be defined externally. Eflomal-generated alignments leave `originNum` and `statusNum` unset, so both default to 0 (`CREATED`). **Allomorph-level note:** BT Extension alignments link *tokens* (source ↔ target), where each source token's morphological form (the "morph" concept in BT Extension) corresponds to a FieldWorks Allomorph (`IMoForm`). The HeadWord's lemma is the LexemeForm (elsewhere allomorph). When converting BT Extension alignments into the unified model, the aligned source occurrence can be further resolved to a `MorphemeBundle.allomorphRef` if morpheme-level analysis is also present, creating a richer link chain: Alignment → Occurrence → Analysis → MorphemeBundle → allomorphRef.
+- **LCM:** No native alignment model; links are produced by external tools.
+- **Paratext:** Not stored in interlinear data; derivable from parallel interlinear selections when two projects share versification.
+- **BT Extension:** `Alignment` entity. Each `Alignment` record with `sourceInstances` / `targetInstances` is decomposed into `AlignmentEndpoint`s — one per instance. BT Extension's "morph" concept (the token's morphological form) maps to a MorphemeBundle-level endpoint when a morpheme analysis is present; otherwise the endpoint targets the whole occurrence. `status` from `statusNum` via BT Extension's `AlignmentStatus` enum (CREATED=0, REJECTED=1, APPROVED=2, NEEDS_REVIEW=3) — lossy mapping where both CREATED and NEEDS_REVIEW collapse to `candidate`. `origin` from `originNum` — an undocumented integer with no enum; descriptive strings must be defined externally. Eflomal-generated alignments leave `originNum` and `statusNum` unset, so both default to 0 (`CREATED`). `confidence` is not natively tracked — inferred from status.
 
 ---
 
-### 1.9 Model Diagram
+### 1.10 AlignmentEndpoint
+
+One side of an alignment link, identifying a precise point of connection within an interlinear text.
+
+| Property | Type | Description |
+|---|---|---|
+| `occurrenceId` | string | The word or punctuation occurrence in the text. |
+| `bundleId` | string (optional) | Identifies a specific MorphemeBundle within one of the occurrence's analyses. When set, the alignment connects at the allomorph / morpheme level. When absent, the alignment connects to the whole (unanalyzed) occurrence. |
+
+**Resolution chains:**
+
+- **Fully analyzed:** AlignmentEndpoint → Occurrence → AnalysisAssignment → Analysis → MorphemeBundle → `allomorphRef` (IMoForm), `lexemeRef` (ILexEntry), `senseRef` (ILexSense), `grammarRef` (IMoMorphSynAnalysis).
+- **Unanalyzed:** AlignmentEndpoint → Occurrence → `surfaceText` only.
+
+---
+
+### 1.11 Model Diagram
 
 ```
-Interlinear (sourceWritingSystem, analysisLanguages[])
+InterlinearAlignment
+  ├─ source: Interlinearization (e.g. Greek / Hebrew)
+  ├─ target: Interlinearization (e.g. vernacular translation)
+  └─ links: AlignmentLink[]
+
+Interlinearization (sourceWritingSystem, analysisLanguages[])
   └─ AnalyzedBook[] (bookRef, textVersion)
        └─ Segment[] (segmentRef, baselineText, freeTranslation, literalTranslation)
             └─ Occurrence[] (surfaceText, anchor, word | punctuation)
-                 └─ AnalysisAssignment[] (approved | suggested)
-                      └─ Analysis (glossText, pos, confidence, origin)
+                 └─ AnalysisAssignment[] (status, groupId?)
+                      └─ Analysis (glossText, pos, confidence, sourceSystem, sourceUser)
                            └─ MorphemeBundle[] (optional; form, writingSystem)
                                 ├─ allomorphRef → IMoForm (specific allomorph)
                                 ├─ lexemeRef    → ILexEntry (owning entry)
                                 ├─ senseRef     → ILexSense (meaning)
                                 └─ grammarRef   → IMoMorphSynAnalysis (grammar)
 
-Alignment (origin, status, notes)
-  ├─ sourceOccurrences[] → Occurrence
-  └─ targetOccurrences[] → Occurrence
+Phrase grouping:
+  Occurrence "en"  → AnalysisAssignment (groupId: "g1") ─┐
+  Occurrence "el"  → AnalysisAssignment (groupId: "g1") ─┴─→ Analysis (gloss: "in the")
+
+AlignmentLink (status, origin, confidence, notes)
+  ├─ sourceEndpoints[] → AlignmentEndpoint
+  └─ targetEndpoints[] → AlignmentEndpoint
+
+AlignmentEndpoint
+  ├─ occurrenceId → Occurrence        (always)
+  └─ bundleId?    → MorphemeBundle    (when morph-level analysis exists)
 ```
 
-#### Lexicon Link Detail
+#### Alignment Workflow
 
 ```
-ILexEntry (dictionary entry)
-  ├─ LexemeFormOA:      IMoForm    ← elsewhere / citation allomorph
-  ├─ AlternateFormsOS:  IMoForm[]  ← conditioned allomorphs
-  ├─ SensesOS:          ILexSense[]
-  └─ MorphoSyntaxAnalysesOC: IMoMorphSynAnalysis[]
+SOURCE INTERLINEAR                        TARGET INTERLINEAR
+──────────────────                        ──────────────────
+Occurrence "λόγον"                        Occurrence "word"
+ └─ Analysis (morph)                       └─ Analysis (morph)
+      └─ MorphemeBundle "λογ-"                  └─ MorphemeBundle "word"
+           │  allomorphRef → IMoForm                 │  allomorphRef → IMoForm
+           │                                         │
+           └──────── AlignmentLink ──────────────────┘
+                sourceEndpoint        targetEndpoint
+                (bundleId set)        (bundleId set)
 
-MorphemeBundle links into this structure:
-  allomorphRef ──► IMoForm  (LexemeFormOA or one of AlternateFormsOS)
-  lexemeRef    ──► ILexEntry
-  senseRef     ──► ILexSense
-  grammarRef   ──► IMoMorphSynAnalysis
+Occurrence "τοῦ"                          Occurrence "the"  (unanalyzed)
+ └─ Analysis (morph)                       │  (no analysis)
+      └─ MorphemeBundle "τοῦ"              │
+           │                               │
+           └──────── AlignmentLink ────────┘
+                sourceEndpoint        targetEndpoint
+                (bundleId set)        (bundleId absent)
 ```
-
-**`form` vs `allomorphRef`:** `form` captures the morpheme surface text in a specific analysis context and may differ from the canonical `IMoForm.Form` due to phonological conditioning. `allomorphRef` is optional; when absent, `form` is the only record of the morpheme shape. For Paratext's built-in lexicon, `allomorphRef` is omitted (the entry and its single form are the same object). For BT Extension, `allomorphRef` maps to `headwordId` (the "morph" concept corresponds to the FieldWorks Allomorph).
 
 ---
 
@@ -282,7 +342,7 @@ The following fields exist in the LCM model but have no equivalent in the Parate
 | **Loss of guess/score metadata** | Medium | `InterlinearLexeme.IsGuess` and `.Score` carry useful provenance information. The unified model captures this via `AnalysisAssignment.confidence` and `status`, but the mapping requires inferring a numeric confidence from a boolean guess flag and a display-oriented score value. Fidelity may be reduced. |
 | **Gloss-only references** | Medium | Paratext interlinear data stores `LexemeId` + `SenseId` references. The actual gloss text is resolved at render time from the lexicon. If the lexicon is not migrated alongside the interlinear data, the analysis will have valid references but no displayable text. Migration must include the lexicon or snapshot the gloss text. |
 | **StringRange anchor fragility** | High | Paratext anchors clusters to verse text via `StringRange` (character offsets). Any USFM editing that changes character positions will invalidate these anchors. The unified model supports multiple anchor types; migration should also capture the surface text for re-anchoring. |
-| **Phrase and multi-word clusters** | Low | Paratext `LexemeCluster.Type` can be `Phrase`, spanning multiple words. The unified model treats each word as an occurrence. Phrase clusters must be decomposed into multiple occurrences that share a single analysis, or the model must allow multi-occurrence analyses. |
+| **Phrase and multi-word clusters** | Low | Paratext `LexemeCluster.Type` can be `Phrase`, spanning multiple words. The unified model treats each word as an occurrence with its own AnalysisAssignment. Phrase clusters are decomposed so that each word's assignment shares a `groupId` and references the same Analysis — see §1.6. |
 | **Missing morpheme-level grammar** | Low | Paratext does not store per-morpheme POS/grammar in the built-in lexicon. `MorphemeBundle.grammarRef` will be empty for Paratext-sourced morpheme analyses unless enriched from an external provider. |
 | **Per-book, per-language file scoping** | Low | Paratext stores interlinear data per book per gloss language. The unified model is not scoped this way. Migration must merge per-language files into a single analyzed text with language-tagged analyses. |
 
@@ -313,5 +373,5 @@ The following fields exist in the LCM model but have no equivalent in the Parate
 |---|---|---|
 | **Lexicon identity reconciliation** | High | All three systems use different identity schemes for lexical entries and senses. LCM uses GUIDs (all objects inherit from `ICmObject`). Paratext uses composite string keys (`LexemeKey.Id` derived from `LexicalForm` + `Type` + `Homograph`; `XmlLexiconSense.Id` is a random 8-char string). BT Extension uses auto-increment integers (`HeadWord.id`, `Sense.id`). Merging interlinear data from multiple sources requires a consistent lexicon identity layer. Without it, the same lexical entry may appear as distinct entries with duplicate analyses. *Refs: lcm-interlinear-model.md §ILexEntry; paratext9-interlinear-model.md §LexemeKey; BT-Extension.md §HeadWord, §Sense.* |
 | **Writing system normalization** | Low | All three systems use BCP-47-based language identifiers, so normalization risk is lower than initially assumed. LCM uses `IetfLanguageTag` (BCP-47) for writing system identifiers on `IMultiUnicode`/`ITsString` properties (*ref: liblcm `WritingSystemServices.cs`, `IetfLanguageTag.IsValid()`*). Paratext uses `LanguageId.Id`, documented as "a hyphen delimited string describing the BCP-47 ISO 639 code and RFC 5646 subtags" — this populates `XmlLexiconGloss.Language` and `InterlinearData.GlossLanguage` (*ref: `ParatextData/Languages/LanguageId.cs`, `ILanguage.cs` "typically the IETF BCP-47 language tag"*). BT Extension stores `Language.cldrCode` (CLDR locale codes, which are BCP-47 based — e.g. `grc`, `heb`) and surfaces it as `Verse.languageCode` (*ref: `data-manager/src/pbteRepository.ts` Language entity, `src/api/types/verses.ts`*). The remaining risk is minor format variation: Paratext may include script/region/variant subtags (e.g. `zh-Hans-CN`), BT Extension may use bare ISO 639 codes (e.g. `heb`), and LCM may include private-use subtags. A normalization pass should canonicalize all tags to the same BCP-47 form. |
-| **Confidence calibration** | Medium | Confidence-relevant metadata differs in kind across systems and none produce a unified numeric score. LCM tracks per-agent approve/disapprove evaluations via `ICmAgentEvaluation` on `IWfiAnalysis`. Paratext stores a boolean `IsGuess` flag on `LexemeCluster` and a display-oriented `Score` on `InterlinearLexeme`. BT Extension has **no confidence or score value** — it tracks only workflow state (`Alignment.originNum` — an undocumented integer defaulting to 0 with no enum; `Alignment.statusNum` mapped via `AlignmentStatus`: CREATED=0, REJECTED=1, APPROVED=2, NEEDS_REVIEW=3; `Instance.termStatusNum` mapped via `BiblicalTermStatus`: NEEDS_REVIEW=0, APPROVED=1, REJECTED=2, OVERRIDDEN=3). Mapping these heterogeneous signals to the unified model's `confidence` enum requires per-system heuristics. *Refs: lcm-interlinear-model.md §IWfiAnalysis (EvaluationsRC); paratext9-interlinear-model.md §LexemeCluster (IsGuess), §InterlinearLexeme (Score); BT-Extension.md §Alignment (originNum, statusNum), §Instance (termStatusNum).* |
+| **Confidence calibration** | Medium | Confidence-relevant metadata differs in kind across systems and none produce a unified numeric score. LCM tracks per-agent approve/disapprove evaluations via `ICmAgentEvaluation` on `IWfiAnalysis`. Paratext stores a boolean `IsGuess` flag on `LexemeCluster` and a display-oriented `Score` on `InterlinearLexeme`. BT Extension has **no confidence or score value** — it tracks only workflow state (`Alignment.originNum` — an undocumented integer defaulting to 0 with no enum; `Alignment.statusNum` mapped via BT Extension's `AlignmentStatus`: CREATED=0, REJECTED=1, APPROVED=2, NEEDS_REVIEW=3; `Instance.termStatusNum` mapped via `BiblicalTermStatus`: NEEDS_REVIEW=0, APPROVED=1, REJECTED=2, OVERRIDDEN=3). Mapping these heterogeneous signals to the unified model's `confidence` enum requires per-system heuristics. *Refs: lcm-interlinear-model.md §IWfiAnalysis (EvaluationsRC); paratext9-interlinear-model.md §LexemeCluster (IsGuess), §InterlinearLexeme (Score); BT-Extension.md §Alignment (originNum, statusNum), §Instance (termStatusNum).* |
 | **Anchor scheme heterogeneity** | Medium | LCM uses paragraph character offsets within `IScrSection` content (with verse context from BBCCCVVV references on `IScrSection.VerseRefStart`/`VerseRefEnd`). Paratext uses USFM `StringRange` objects (`ClusterData.TextRange`). BT Extension uses composite BCVWP strings (`Instance.instanceBcvwp`). The unified model accepts all schemes via the generic `anchor` field, but tooling that consumes the model must handle all three formats. Standardizing on BCVWP where possible reduces this burden. *Refs: lcm-interlinear-model.md §ISegment (BeginOffset/EndOffset), §IScrSection (VerseRefStart/VerseRefEnd); paratext9-interlinear-model.md §ClusterData (TextRange); BT-Extension.md §Instance (instanceBcvwp).* |
