@@ -165,6 +165,16 @@ export function useInterlinear() {
   const canGoBack = activeGroupIndex > 0;
   const canGoForward = activeGroupIndex < linkedGroups.length - 1;
 
+  /** Jump directly to a group by its group index. */
+  const goToGroup = useCallback(
+    (groupIndex: number) => {
+      const groups = linkedGroupsRef.current;
+      const target = groups[groupIndex];
+      if (target) setActiveIndex(target.startIndex);
+    },
+    [],
+  );
+
   return {
     occurrences,
     activeIndex,
@@ -176,6 +186,7 @@ export function useInterlinear() {
     updateGloss,
     updateMorphemeText,
     toggleLink,
+    goToGroup,
     canGoBack,
     canGoForward,
   };

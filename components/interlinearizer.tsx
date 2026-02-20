@@ -33,6 +33,7 @@ export function Interlinearizer() {
     updateGloss,
     updateMorphemeText,
     toggleLink,
+    goToGroup,
     canGoBack,
     canGoForward,
   } = useInterlinear();
@@ -52,6 +53,30 @@ export function Interlinearizer() {
     const targetTranslate = ACTIVE_LEFT_PX - activeEl.offsetLeft;
     setTranslateX(targetTranslate);
   }, [activeGroupIndex]);
+
+  /**
+   * Click a non-active group to make it active.
+   * Alignment:
+   *  - clicked group was LEFT of active  → pin its LEFT edge at ACTIVE_LEFT_PX
+   *  - clicked group was RIGHT of active → pin its RIGHT edge at ACTIVE_LEFT_PX
+   */
+  const clickGroup = useCallback(
+    (gi: number) => {
+      if (gi === activeGroupIndex) return;
+      const el = groupRefs.current.get(gi);
+      if (!el) return;
+
+      if (gi < activeGroupIndex) {
+        // Left side: left-edge align
+        setTranslateX(ACTIVE_LEFT_PX - el.offsetLeft);
+      } else {
+        // Right side: right-edge align
+        setTranslateX(ACTIVE_LEFT_PX - (el.offsetLeft + el.offsetWidth));
+      }
+      goToGroup(gi);
+    },
+    [activeGroupIndex, goToGroup],
+  );
 
   useEffect(() => {
     recalcTranslate();
@@ -146,8 +171,9 @@ export function Interlinearizer() {
                       groupRefs.current.delete(gi);
                     }
                   }}
-                  className="shrink-0"
+                  className={cn("shrink-0", !isActive && "cursor-pointer")}
                   style={{ opacity: isActive ? 1 : opacity }}
+                  onClick={!isActive ? () => clickGroup(gi) : undefined}
                 >
                   <OccurrenceBox
                     group={group}
