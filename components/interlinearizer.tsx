@@ -7,9 +7,11 @@ import { LinkButton } from "@/components/link-button";
 import { RowOrderSettings } from "@/components/row-order-settings";
 import { useRowOrder } from "@/hooks/use-row-order";
 import { Button } from "@/components/ui/button";
-import { Settings2 } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { Settings2, SlidersHorizontal } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { OccurrenceType } from "@/lib/interlinear-model";
+import { useTextConfig } from "@/hooks/use-text-config";
 
 /**
  * The main interlinearizer component.
@@ -30,6 +32,9 @@ export function Interlinearizer() {
     linkedGroups,
     segments,
     occurrenceGroupMap,
+    segmentTranslations,
+    updateLiteralTranslation,
+    updateFreeTranslation,
     moveForward,
     moveBackward,
     toggleApprove,
@@ -40,6 +45,8 @@ export function Interlinearizer() {
     canGoBack,
     canGoForward,
   } = useInterlinear();
+
+  const textConfig = useTextConfig();
 
   const rowOrder = useRowOrder();
   const stripRef = useRef<HTMLDivElement>(null);
@@ -269,45 +276,106 @@ export function Interlinearizer() {
         )}
       </div>
 
-      {/* Full text preview */}
+      {/* Text area */}
       <div className="px-3 py-2 rounded-md bg-muted/50 border border-border">
-        <p className="text-xs text-muted-foreground mb-1 font-medium">
-          Source Text
-        </p>
-        <p className="text-sm font-mono leading-relaxed text-foreground">
-          {segments.flatMap((seg, si) =>
-            seg.occurrences.map((occ, oi) => {
-              const groupIndex = occurrenceGroupMap.get(occ.id) ?? -1;
-              const isInActiveGroup = groupIndex === activeGroupIndex;
-              const approved = occApprovedById.get(occ.id) ?? false;
-              const isPunct = occ.type === OccurrenceType.Punctuation;
-              // Look ahead across segment boundaries for spacing
-              const nextOcc =
-                seg.occurrences[oi + 1] ?? segments[si + 1]?.occurrences[0];
-              const isLastToken =
-                si === segments.length - 1 && oi === seg.occurrences.length - 1;
-              const nextIsPunct = nextOcc?.type === OccurrenceType.Punctuation;
+        {/* Header: config button only, right-aligned */}
+        <div className="flex items-center justify-end mb-1">
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={textConfig.toggle}
+            aria-label="Text display settings"
+            className={cn(
+              "text-muted-foreground hover:text-foreground",
+              textConfig.isOpen && "text-foreground",
+            )}
+          >
+            <SlidersHorizontal className="size-4" />
+          </Button>
+        </div>
 
-              return (
-                <span
-                  key={occ.id}
-                  className={cn(
-                    "transition-colors",
-                    !isInActiveGroup && "cursor-pointer",
-                    isInActiveGroup && "bg-sky-200 rounded px-0.5",
-                    approved && !isInActiveGroup && "text-emerald-700",
-                    !approved && !isInActiveGroup && "text-muted-foreground",
-                  )}
-                  onClick={() => groupIndex !== -1 && fadeToGroup(groupIndex)}
-                >
-                  {occ.surfaceText}
-                  {!isLastToken && !isPunct && !nextIsPunct && " "}
-                  {!isLastToken && isPunct && " "}
-                </span>
-              );
-            }),
-          )}
-        </p>
+        {/* Inline config panel */}
+        {textConfig.isOpen && (
+          <div className="mb-2 px-2 py-1.5 rounded border border-border bg-background flex flex-col gap-1.5 text-xs">
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={textConfig.showLiteral}
+                onChange={textConfig.toggleLiteral}
+              />
+              Literal translation
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={textConfig.showFree}
+                onChange={textConfig.toggleFree}
+              />
+              Free translation
+            </label>
+          </div>
+        )}
+
+        {/* Segment-by-segment text + optional translation inputs */}
+        {segments.map((seg, si) => (
+          <div key={seg.id} className="mb-1 last:mb-0">
+            <p className="text-sm font-mono leading-relaxed text-foreground">
+              {seg.occurrences.map((occ, oi) => {
+                const groupIndex = occurrenceGroupMap.get(occ.id) ?? -1;
+                const isInActiveGroup = groupIndex === activeGroupIndex;
+                const approved = occApprovedById.get(occ.id) ?? false;
+                const isPunct = occ.type === OccurrenceType.Punctuation;
+                const nextOcc =
+                  seg.occurrences[oi + 1] ?? segments[si + 1]?.occurrences[0];
+                const isLastToken =
+                  si === segments.length - 1 &&
+                  oi === seg.occurrences.length - 1;
+                const nextIsPunct =
+                  nextOcc?.type === OccurrenceType.Punctuation;
+
+                return (
+                  <span
+                    key={occ.id}
+                    className={cn(
+                      "transition-colors",
+                      !isInActiveGroup && "cursor-pointer",
+                      isInActiveGroup && "bg-sky-200 rounded px-0.5",
+                      approved && !isInActiveGroup && "text-emerald-700",
+                      !approved && !isInActiveGroup && "text-muted-foreground",
+                    )}
+                    onClick={() =>
+                      groupIndex !== -1 && fadeToGroup(groupIndex)
+                    }
+                  >
+                    {occ.surfaceText}
+                    {!isLastToken && !isPunct && !nextIsPunct && " "}
+                    {!isLastToken && isPunct && " "}
+                  </span>
+                );
+              })}
+            </p>
+            {textConfig.showLiteral && (
+              <Textarea
+                className="mt-1 text-xs min-h-0 h-8 py-1 resize-none font-mono"
+                placeholder="Literal…"
+                value={segmentTranslations[seg.id]?.literal ?? ""}
+                onChange={(e) =>
+                  updateLiteralTranslation(seg.id, e.target.value)
+                }
+              />
+            )}
+            {textConfig.showFree && (
+              <Textarea
+                className="mt-1 text-xs min-h-0 h-8 py-1 resize-none font-mono"
+                placeholder="Free…"
+                value={segmentTranslations[seg.id]?.free ?? ""}
+                onChange={(e) =>
+                  updateFreeTranslation(seg.id, e.target.value)
+                }
+              />
+            )}
+          </div>
+        ))}
       </div>
     </div>
   );

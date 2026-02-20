@@ -12,11 +12,32 @@ function buildInitialOccurrences(): Occurrence[] {
   });
 }
 
+/** Seed translation state from canonical segment data. */
+function buildInitialTranslations(): Record<
+  string,
+  { literal: string; free: string }
+> {
+  const book = sampleInterlinearization.books[0];
+  if (!book) return {};
+  const result: Record<string, { literal: string; free: string }> = {};
+  for (const seg of book.segments) {
+    result[seg.id] = {
+      literal: seg.literalTranslation?.["en"] ?? "",
+      free: seg.freeTranslation?.["en"] ?? "",
+    };
+  }
+  return result;
+}
+
 export function useInterlinear() {
   const [occurrences, setOccurrences] = useState<Occurrence[]>(
     buildInitialOccurrences,
   );
   const [activeIndex, setActiveIndex] = useState(0);
+
+  const [segmentTranslations, setSegmentTranslations] = useState<
+    Record<string, { literal: string; free: string }>
+  >(buildInitialTranslations);
 
   // Memoized so dependent values (occurrenceGroupMap) only rebuild when occurrences change
   const linkedGroups = useMemo(
@@ -184,6 +205,26 @@ export function useInterlinear() {
     [activeGroupIndex],
   );
 
+  const updateLiteralTranslation = useCallback(
+    (segmentId: string, text: string) => {
+      setSegmentTranslations((prev) => ({
+        ...prev,
+        [segmentId]: { ...prev[segmentId], literal: text },
+      }));
+    },
+    [],
+  );
+
+  const updateFreeTranslation = useCallback(
+    (segmentId: string, text: string) => {
+      setSegmentTranslations((prev) => ({
+        ...prev,
+        [segmentId]: { ...prev[segmentId], free: text },
+      }));
+    },
+    [],
+  );
+
   const canGoBack = activeGroupIndex > 0;
   const canGoForward = activeGroupIndex < linkedGroups.length - 1;
 
@@ -201,6 +242,9 @@ export function useInterlinear() {
     linkedGroups,
     segments,
     occurrenceGroupMap,
+    segmentTranslations,
+    updateLiteralTranslation,
+    updateFreeTranslation,
     moveForward,
     moveBackward,
     toggleApprove,
