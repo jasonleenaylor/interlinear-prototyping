@@ -125,7 +125,8 @@ function buildSegments(): Segment[] {
     const segId = `seg-gen-1-${verseNum}`;
     return {
       id: segId,
-      segmentRef: `GEN 1:${verseNum}`,
+      startRef: { book: "GEN", chapter: 1, verse: verseNum },
+      endRef: { book: "GEN", chapter: 1, verse: verseNum },
       baselineText: text,
       occurrences: tokenize(segId, text),
     };

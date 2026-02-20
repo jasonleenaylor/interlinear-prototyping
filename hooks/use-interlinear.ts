@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { type Occurrence, buildLinkedGroups } from "@/lib/interlinear-types";
+import { type Segment as CanonicalSegment } from "@/lib/interlinear-model";
 import { sampleInterlinearization, sampleAnalyses } from "@/lib/sample-data";
 import { adaptToUiOccurrences } from "@/lib/adapt-sample-data";
 
@@ -27,6 +28,22 @@ function buildInitialTranslations(): Record<
     };
   }
   return result;
+}
+
+function sameRef(
+  a: CanonicalSegment["startRef"],
+  b: CanonicalSegment["startRef"],
+): boolean {
+  return (
+    a.book === b.book &&
+    a.chapter === b.chapter &&
+    a.verse === b.verse &&
+    (a.fragment ?? "") === (b.fragment ?? "")
+  );
+}
+
+function isMergedSegment(seg: CanonicalSegment): boolean {
+  return !sameRef(seg.startRef, seg.endRef);
 }
 
 export function useInterlinear() {
@@ -58,10 +75,9 @@ export function useInterlinear() {
       activeIndex < g.startIndex + g.occurrences.length,
   );
 
-  // Canonical segments — stable reference (source data never changes at runtime)
-  const segments = useMemo(
+  // Segments as mutable state — can be merged/split at runtime
+  const [segments, setSegments] = useState<CanonicalSegment[]>(
     () => sampleInterlinearization.books[0]?.segments ?? [],
-    [],
   );
 
   // O(1) lookup: canonical occurrence ID → group index.
@@ -225,6 +241,35 @@ export function useInterlinear() {
     [],
   );
 
+  /** Merge two adjacent segments into one. No-op if either is already merged. */
+  const mergeSegments = useCallback((segId1: string, segId2: string) => {
+    setSegments((prev) => {
+      const i1 = prev.findIndex((s) => s.id === segId1);
+      if (i1 === -1 || i1 + 1 >= prev.length) return prev;
+      if (prev[i1 + 1].id !== segId2) return prev;
+      const a = prev[i1];
+      const b = prev[i1 + 1];
+      if (isMergedSegment(a) || isMergedSegment(b)) {
+        return prev; // don't merge already-merged segments
+      }
+      const mergedId = a.id;
+      const mergedOccurrences = [...a.occurrences, ...b.occurrences].map(
+        (occ, idx) => ({
+          ...occ,
+          segmentId: mergedId,
+          index: idx,
+        }),
+      );
+      const merged: CanonicalSegment = {
+        ...a,
+        startRef: a.startRef,
+        endRef: b.endRef,
+        occurrences: mergedOccurrences,
+      };
+      return [...prev.slice(0, i1), merged, ...prev.slice(i1 + 2)];
+    });
+  }, []);
+
   const canGoBack = activeGroupIndex > 0;
   const canGoForward = activeGroupIndex < linkedGroups.length - 1;
 
@@ -245,6 +290,7 @@ export function useInterlinear() {
     segmentTranslations,
     updateLiteralTranslation,
     updateFreeTranslation,
+    mergeSegments,
     moveForward,
     moveBackward,
     toggleApprove,

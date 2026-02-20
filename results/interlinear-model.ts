@@ -130,11 +130,11 @@ export interface AnalyzedBook {
 export interface Segment {
   id: string;
 
-  /**
-   * Canonical reference (e.g. verse reference, paragraph index + offset
-   * range).
-   */
-  segmentRef: string;
+  /** Start of the scripture range for this segment (BCVF). */
+  startRef: ScriptureRef;
+
+  /** End of the scripture range for this segment (BCVF). */
+  endRef: ScriptureRef;
 
   /** Raw text of the segment, for display and validation. */
   baselineText?: string;
@@ -147,6 +147,15 @@ export interface Segment {
 
   /** Ordered word / punctuation tokens in this segment. */
   occurrences: Occurrence[];
+}
+
+/** Scripture reference in BCVF form (Book-Chapter-Verse-Fragment). */
+export interface ScriptureRef {
+  book: string;
+  chapter: number;
+  verse: number;
+  /** Optional verse fragment marker, e.g. "a", "b". */
+  fragment?: string;
 }
 
 /** A string value keyed by writing-system tag. */
