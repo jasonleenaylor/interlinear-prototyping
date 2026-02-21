@@ -123,11 +123,12 @@ export function MorphemeEditor({
               value={seg}
               onChange={(e) => handleChange(e, i)}
               onKeyDown={(e) => handleKeyDown(e, i)}
+              size={1}
               className="w-full h-full px-1.5 py-1 text-center text-xs font-mono bg-transparent outline-none"
               spellCheck={false}
             />
           ) : (
-            <div className="px-1.5 py-1 text-muted-foreground truncate">
+            <div className="px-1.5 py-1 text-muted-foreground">
               {seg || "\u00A0"}
             </div>
           )}

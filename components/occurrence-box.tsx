@@ -50,12 +50,12 @@ export function OccurrenceBox({
       )}
     >
       {/* Top row: surface text for each occurrence in its own inner box */}
-      <div className="flex items-stretch px-1.5 pt-1.5 pb-1 overflow-visible">
+      <div className="flex items-stretch px-0.5 pt-1 pb-0.5 overflow-visible">
         {group.occurrences.map((occ, i) => (
           <div key={occ.id} className="relative flex-1 min-w-0">
             <div
               className={cn(
-                "mx-1 px-3 py-1.5 text-center font-mono text-base font-semibold text-foreground rounded border",
+                "mx-0.5 px-1.5 py-0.5 text-center font-mono text-base font-semibold text-foreground rounded border",
                 allApproved
                   ? "border-muted-foreground/20 bg-white"
                   : "border-sky-300 bg-sky-100/50",
@@ -67,7 +67,7 @@ export function OccurrenceBox({
             {i < group.occurrences.length - 1 && (
               <button
                 onClick={() => onUnlink(group.startIndex + i)}
-                className="absolute right-0 top-1/2 z-10 flex h-8 w-6 -translate-y-1/2 translate-x-1/2 items-center justify-center group/unlink"
+                className="absolute right-0 top-1/2 z-10 flex h-6 w-4 -translate-y-1/2 translate-x-1/2 items-center justify-center group/unlink"
                 aria-label="Unlink occurrences"
                 type="button"
               >
@@ -88,7 +88,7 @@ export function OccurrenceBox({
           return (
             <div
               key="gloss"
-              className="px-2 py-1 border-t border-muted-foreground/15"
+              className="flex items-center px-1 py-0.5 border-t border-muted-foreground/15"
             >
               {isActive ? (
                 <Input
@@ -97,7 +97,8 @@ export function OccurrenceBox({
                     onUpdateGloss(group.startIndex, e.target.value)
                   }
                   placeholder="gloss"
-                  className="h-7 text-sm font-mono bg-white border-muted-foreground/20 text-center"
+                  size={1}
+                  className="flex-1 min-w-0 w-auto h-6 text-sm font-mono bg-white border-muted-foreground/20 text-center"
                   autoFocus
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
@@ -106,7 +107,7 @@ export function OccurrenceBox({
                   }}
                 />
               ) : (
-                <div className="h-7 flex items-center justify-center text-sm font-mono text-muted-foreground">
+                <div className="h-6 w-full flex items-center justify-center text-sm font-mono text-muted-foreground">
                   {gloss || "\u00A0"}
                 </div>
               )}
@@ -117,13 +118,13 @@ export function OccurrenceBox({
           return (
             <div
               key="morphemes"
-              className="flex border-t border-muted-foreground/15"
+              className="flex border-t border-muted-foreground/15 gap-0.5"
             >
               {group.occurrences.map((occ, i) => (
                 <div
                   key={`morph-${occ.id}`}
                   className={cn(
-                    "px-1.5 py-1.5 flex-1 min-w-0",
+                    "px-0.5 py-0.5 flex-1",
                     i < group.occurrences.length - 1 &&
                       "border-r border-dashed border-muted-foreground/30",
                   )}

@@ -301,7 +301,7 @@ between non-punctuation occurrences.
 ## E-01 · Align joined-occurrence divider with morpheme split
 
 **Type:** enhancement  
-**Status:** pending
+**Status:** done — committed
 
 ### Goal
 When occurrences are joined into a group, the divider line visible in the first (surface)
@@ -312,6 +312,12 @@ row should vertically align with the divider between corresponding morpheme boxe
 - Alignment should hold for any row order and for grouped occurrences of mixed widths.
 - Hover affordances for unlink remain available without shifting divider alignment.
 
+### Resolution
+- Surface row now uses the same per-occurrence flex partitioning as morpheme cells,
+  so occurrence boundaries match across rows.
+- Unlink control is positioned absolutely on the shared boundary, so hover/click
+  affordance remains available without consuming layout width.
+
 **Likely files:** `components/occurrence-box.tsx`
 
 ---
@@ -319,7 +325,7 @@ row should vertically align with the divider between corresponding morpheme boxe
 ## E-02 · Reduce visual density of joined-occurrence analysis view
 
 **Type:** enhancement  
-**Status:** pending
+**Status:** done — committed
 
 ### Goal
 Reduce vertical and horizontal space used by joined occurrence analysis so larger groups
@@ -331,4 +337,34 @@ fit on screen with less scrolling while preserving readability and editability.
 - Compact literal/free input heights when multiple groups are visible.
 - Preserve accessible hit targets for controls after compaction.
 
+### Resolution
+- Surface and morpheme rows now use tighter padding and gap values.
+- Root cause of excessive box width was the HTML `size` attribute defaulting to 20
+  characters on both gloss (`Input`) and morpheme inputs — fixed with `size={1}`.
+- Non-active gloss centering corrected by adding `w-full` to the static display div.
+- Morpheme cells now grow to fit content (`min-w-0` removed) while still splitting evenly.
+- Hit targets for controls remain accessible.
+
 **Likely files:** `components/occurrence-box.tsx`, `components/interlinearizer.tsx`
+
+---
+
+## F-11 · Link disjoint occurrences without auto-linking intermediates
+
+**Status:** pending
+
+### Goal
+Allow users to link two non-adjacent occurrences directly without forcing all
+intermediate occurrences into the same link chain.
+
+### Behaviour
+- Linking two disjoint occurrences creates a direct pair link only between the selected
+  occurrences.
+- Intermediate occurrences remain unlinked unless the user explicitly links them.
+- A curved connector is rendered between the two linked occurrences.
+- The connector should attach to the nearest facing corners/edges of the two occurrence
+  boxes and remain visually stable while scrolling and fading.
+- Existing adjacent linking/unlinking behaviour remains supported.
+
+**Likely files:** `lib/interlinear-types.ts`, `hooks/use-interlinear.ts`,
+`components/interlinearizer.tsx`, `components/occurrence-box.tsx`
