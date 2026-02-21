@@ -211,8 +211,24 @@ export function useInterlinear() {
   );
 
   const toggleLink = useCallback(
-    (occIndex: number) => {
+    (occIndex: number, rightOccIndex?: number) => {
       const occs = occurrences;
+
+      // Cross-punctuation disjoint link: caller supplies explicit right occ index.
+      // Bypass the punctuation guard and directly toggle the disjoint link.
+      if (rightOccIndex !== undefined) {
+        const key = `${occIndex}:${rightOccIndex}`;
+        setDisjointLinks((prev) => {
+          const next = new Set(prev);
+          if (next.has(key)) {
+            next.delete(key);
+          } else {
+            next.add(key);
+          }
+          return next;
+        });
+        return;
+      }
 
       // Skip punctuation boundaries for linking.
       if (occs[occIndex]?.isPunctuation || occs[occIndex + 1]?.isPunctuation) {

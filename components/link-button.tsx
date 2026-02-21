@@ -12,9 +12,11 @@ import { cn } from "@/lib/utils"
 interface LinkButtonProps {
   isLinked: boolean
   onClick: () => void
+  ariaLabel?: string
 }
 
-export function LinkButton({ isLinked, onClick }: LinkButtonProps) {
+export function LinkButton({ isLinked, onClick, ariaLabel }: LinkButtonProps) {
+  const label = ariaLabel ?? (isLinked ? "Unlink occurrences" : "Link occurrences")
   return (
     <Tooltip>
       <TooltipTrigger asChild>
@@ -28,7 +30,7 @@ export function LinkButton({ isLinked, onClick }: LinkButtonProps) {
               ? "text-sky-600 hover:text-sky-700 bg-sky-50 hover:bg-sky-100"
               : "text-muted-foreground/50 hover:text-muted-foreground hover:bg-muted"
           )}
-          aria-label={isLinked ? "Unlink occurrences" : "Link occurrences"}
+          aria-label={label}
         >
           {isLinked ? (
             <Link2 className="size-3.5" />
@@ -38,7 +40,7 @@ export function LinkButton({ isLinked, onClick }: LinkButtonProps) {
         </Button>
       </TooltipTrigger>
       <TooltipContent>
-        {isLinked ? "Unlink occurrences" : "Link occurrences"}
+        {label}
       </TooltipContent>
     </Tooltip>
   )

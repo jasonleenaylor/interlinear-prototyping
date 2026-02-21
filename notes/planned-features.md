@@ -375,3 +375,49 @@ intermediate occurrences into the same link chain.
 
 **Likely files:** `lib/interlinear-types.ts`, `hooks/use-interlinear.ts`,
 `components/interlinearizer.tsx`, `components/occurrence-box.tsx`
+---
+
+## F-12 · Link button above punctuation to create cross-punctuation disjoint link
+
+**Status:** done — committed
+
+### Goal
+When two word groups are separated by one or more punctuation occurrences, a link button
+should appear horizontally inline with the other link buttons, positioned above the
+punctuation. Clicking it creates a disjoint link between the two flanking word groups,
+skipping over the punctuation entirely.
+
+### Behaviour
+- A link button is rendered above every punctuation occurrence (or run of punctuation)
+  that sits between two non-punctuation word groups.
+- Visually it aligns horizontally with the existing `<>` link buttons so it is obvious
+  which words it would join.
+- Clicking creates (or removes) a disjoint link between the last occurrence of the
+  left word group and the first occurrence of the right word group — identical to the
+  result of a non-adjacent `toggleLink` call.
+- Existing punctuation rendering (plain muted text, not navigable) is unchanged.
+
+**Likely files:** `components/interlinearizer.tsx`, `hooks/use-interlinear.ts`
+
+---
+
+## F-13 · Auto-group adjacent occurrence when linking into an existing disjoint set
+
+**Status:** pending
+
+### Goal
+If a user creates an adjacent link between an occurrence and an occurrence that is
+already part of a disjoint set, the two occurrences should be merged into the same
+group automatically (i.e. treated as an adjacent link), rather than creating a
+second overlapping disjoint link.
+
+### Behaviour
+- When `toggleLink` is called for an adjacent pair and either occurrence belongs to an
+  existing disjoint link, the adjacent merge proceeds as normal (the two groups join).
+- The disjoint link entry that referenced that occurrence is updated or removed so the
+  data model stays consistent: the merged group now spans both occurrences and no
+  dangling disjoint key points into the middle of a group.
+- Inverse: unlinking a group that was formed this way should restore the disjoint link
+  if the original cross-punctuation relationship still makes sense.
+
+**Likely files:** `hooks/use-interlinear.ts`, `components/interlinearizer.tsx`

@@ -234,9 +234,9 @@ export function Interlinearizer() {
       if (gi < linkedGroups.length - 1) {
         const group = linkedGroups[gi];
         const lastOccIndex = group.startIndex + group.occurrences.length - 1;
-        // Skip punctuation boundaries for linking UI.
-        // Punctuation stays visible as plain text groups between words.
+
         if (!isPunctuationGroup(gi) && !isPunctuationGroup(gi + 1)) {
+          // Normal word-to-word boundary: standard link button
           items.push({
             type: "link",
             occIndex: lastOccIndex,
@@ -248,6 +248,43 @@ export function Interlinearizer() {
 
     return items;
   }, [linkedGroups, occurrences]);
+
+  /**
+   * For each punctuation group index, the cross-punctuation link info (if it sits
+   * between two word groups).  Used to render an overlay link button above the punct text.
+   */
+  const crossPunctLinks = useMemo(() => {
+    const map = new Map<
+      number,
+      { leftOccIndex: number; rightOccIndex: number; isLinked: boolean }
+    >();
+    const isPunctuationGroup = (gi: number) =>
+      linkedGroups[gi]?.occurrences.every((o) => o.isPunctuation);
+
+    for (let gi = 0; gi < linkedGroups.length; gi++) {
+      if (!isPunctuationGroup(gi)) continue;
+      // Find the nearest word group to the left
+      let leftGi = gi - 1;
+      while (leftGi >= 0 && isPunctuationGroup(leftGi)) leftGi--;
+      // Find the nearest word group to the right
+      let rightGi = gi + 1;
+      while (rightGi < linkedGroups.length && isPunctuationGroup(rightGi)) rightGi++;
+      if (leftGi < 0 || rightGi >= linkedGroups.length) continue;
+
+      const leftGroup = linkedGroups[leftGi];
+      const rightGroup = linkedGroups[rightGi];
+      const leftOccIndex = leftGroup.startIndex + leftGroup.occurrences.length - 1;
+      const rightOccIndex = rightGroup.startIndex;
+      const key = `${leftOccIndex}:${rightOccIndex}`;
+
+      // Only assign to the FIRST punct group in a run (avoids duplicate buttons)
+      const prevIsAlsoPunct = gi > 0 && isPunctuationGroup(gi - 1);
+      if (!prevIsAlsoPunct) {
+        map.set(gi, { leftOccIndex, rightOccIndex, isLinked: disjointLinks.has(key) });
+      }
+    }
+    return map;
+  }, [linkedGroups, disjointLinks]);
 
   /**
    * Every group index that is an endpoint of any disjoint link.
@@ -375,6 +412,7 @@ export function Interlinearizer() {
                 const opacity = Math.max(0.15, 1 - distance * 0.05);
 
                 if (isPunctuationGroup) {
+                  const xLink = crossPunctLinks.get(gi);
                   return (
                     <div
                       key={`group-${group.startIndex}`}
@@ -386,15 +424,30 @@ export function Interlinearizer() {
                           groupRefs.current.delete(gi);
                         }
                       }}
-                      className={cn(
-                        "shrink-0 px-2 py-2 text-sm font-mono text-muted-foreground select-none",
-                        !isActive && "cursor-pointer",
-                        isActive && "rounded bg-sky-100 text-foreground",
-                      )}
-                      style={{ opacity: isActive ? 1 : opacity }}
-                      onClick={!isActive ? () => clickGroup(gi) : undefined}
+                      className="relative shrink-0"
                     >
-                      {group.occurrences.map((o) => o.text).join("")}
+                      {xLink && (
+                        <div className="absolute -top-1 left-0 right-0 flex justify-center z-10">
+                          <div data-testid="cross-punct-link-btn">
+                            <LinkButton
+                              isLinked={xLink.isLinked}
+                              ariaLabel={xLink.isLinked ? "Unlink across punctuation" : "Link across punctuation"}
+                              onClick={() =>
+                                toggleLink(xLink.leftOccIndex, xLink.rightOccIndex)
+                              }
+                            />
+                          </div>
+                        </div>
+                      )}
+                      <div
+                        className={cn(
+                          "px-2 py-2 text-sm font-mono text-muted-foreground select-none",
+                          xLink && "pt-6",
+                        )}
+                        style={{ opacity: isActive ? 1 : opacity }}
+                      >
+                        {group.occurrences.map((o) => o.text).join("")}
+                      </div>
                     </div>
                   );
                 }

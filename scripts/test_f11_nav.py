@@ -23,6 +23,7 @@ import time
 GHOST_SEL        = '[data-testid="disjoint-ghost-chip"]'
 DISJOINT_TOK_SEL = '[data-testid="disjoint-occ-token"]'
 ARC_SEL          = "svg.absolute path"
+# Exclude cross-punctuation link buttons (different aria-label)
 LINK_BTN_SEL     = 'button[aria-label="Link occurrences"]'
 NAV_NEXT_SEL     = 'button[aria-label="Next occurrence"]'
 NAV_PREV_SEL     = 'button[aria-label="Previous occurrence"]'

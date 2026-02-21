@@ -32,7 +32,9 @@ import re
 GHOST_SEL        = '[data-testid="disjoint-ghost-chip"]'
 DISJOINT_TOK_SEL = '[data-testid="disjoint-occ-token"]'
 ARC_PATH_SEL     = "svg.absolute path"
+# Regular link buttons — excludes cross-punctuation link buttons
 LINK_BTN_SEL     = 'button[aria-label="Link occurrences"]'
+CROSS_LINK_SEL   = 'button[aria-label="Link across punctuation"]'
 NAV_NEXT_SEL     = 'button[aria-label="Next occurrence"]'
 NAV_PREV_SEL     = 'button[aria-label="Previous occurrence"]'
 ACTIVE_GRP_SEL   = '[data-active="true"]'
@@ -185,7 +187,7 @@ with sync_playwright() as p:
     print("TEST GROUP A: Ghost (right endpoint) is never the active group")
     print("=" * 70)
 
-    leftA, rightA = setup(page)
+    leftA, rightA = setup(page, link_btn_index=25, nav_before=2)
     if rightA is not None:
         print("  Link: leftStart={}, rightStart={}".format(leftA, rightA))
         active_history = []
@@ -224,7 +226,7 @@ with sync_playwright() as p:
     print("TEST GROUP B: Arc solid/dashed across 4 nav positions")
     print("=" * 70)
 
-    leftB, rightB = setup(page)
+    leftB, rightB = setup(page, link_btn_index=25, nav_before=2)
     if rightB is not None:
         print("  Link: leftStart={}, rightStart={}".format(leftB, rightB))
 
@@ -282,7 +284,7 @@ with sync_playwright() as p:
 
         # B4: AFTER right endpoint
         print("\n  B4: AFTER right endpoint -> arc DASHED, 2 ghosts, 0 tokens")
-        for _ in range(20):
+        for _ in range(35):
             cur = active_start(page)
             if cur is not None and rightB is not None and cur > rightB:
                 break
@@ -310,7 +312,7 @@ with sync_playwright() as p:
     print("TEST GROUP C: Arc coordinates match group bounding rects")
     print("=" * 70)
 
-    leftC, rightC = setup(page)
+    leftC, rightC = setup(page, link_btn_index=25, nav_before=2)
     if rightC is not None:
         # Active = left endpoint
         coords = get_arc_coords(page)
@@ -374,7 +376,7 @@ with sync_playwright() as p:
     print("TEST GROUP D: Left endpoint renders full OccurrenceBox round-trip")
     print("=" * 70)
 
-    leftD, rightD = setup(page)
+    leftD, rightD = setup(page, link_btn_index=25, nav_before=2)
     if rightD is not None:
         cur = active_start(page)
         check("D1: active IS left endpoint",                  cur == leftD,                       "==", True)
