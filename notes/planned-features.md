@@ -255,7 +255,7 @@ one containing the clicked token and all tokens after it.
 ## B-01 · Cannot merge merged segment forward
 
 **Type:** bug  
-**Status:** pending
+**Status:** done (will commit with next verified batch)
 
 ### Description
 After merging two adjacent segments (A + B), the newly merged segment cannot be merged
@@ -266,13 +266,18 @@ building a longer contiguous merged range (A + B + C).
 A merged segment should still be eligible to merge with its immediate next segment,
 as long as order remains adjacent and in sequence.
 
+### Resolution
+- Merge button now remains enabled when the current segment is already merged.
+- Only the case where the *next* segment is already merged remains disabled.
+- Hook merge guard now allows extending a merged segment forward (A+B)+C.
+
 **Likely files:** `components/interlinearizer.tsx`, `hooks/use-interlinear.ts`
 
 ---
 
 ## F-10 · Render punctuation as plain text in interlinear flow
 
-**Status:** pending
+**Status:** done (awaiting manual verification before commit)
 
 ### Goal
 Punctuation occurrences should remain visible in the source text flow but should not
@@ -290,3 +295,40 @@ between non-punctuation occurrences.
 
 **Files:** `components/interlinearizer.tsx`, `components/occurrence-box.tsx`,
 `hooks/use-interlinear.ts`, `lib/interlinear-types.ts`
+
+---
+
+## E-01 · Align joined-occurrence divider with morpheme split
+
+**Type:** enhancement  
+**Status:** pending
+
+### Goal
+When occurrences are joined into a group, the divider line visible in the first (surface)
+row should vertically align with the divider between corresponding morpheme boxes below.
+
+### Behaviour
+- Surface-row divider should share the same x-position as the morpheme-row split.
+- Alignment should hold for any row order and for grouped occurrences of mixed widths.
+- Hover affordances for unlink remain available without shifting divider alignment.
+
+**Likely files:** `components/occurrence-box.tsx`
+
+---
+
+## E-02 · Reduce visual density of joined-occurrence analysis view
+
+**Type:** enhancement  
+**Status:** pending
+
+### Goal
+Reduce vertical and horizontal space used by joined occurrence analysis so larger groups
+fit on screen with less scrolling while preserving readability and editability.
+
+### Candidate adjustments
+- Tighten padding and gap values in grouped surface/morpheme rows.
+- Reduce link-divider footprint between joined occurrences.
+- Compact literal/free input heights when multiple groups are visible.
+- Preserve accessible hit targets for controls after compaction.
+
+**Likely files:** `components/occurrence-box.tsx`, `components/interlinearizer.tsx`

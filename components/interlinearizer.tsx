@@ -68,10 +68,7 @@ export function Interlinearizer() {
     (
       a: { book: string; chapter: number; verse: number; fragment?: string },
       b: { book: string; chapter: number; verse: number; fragment?: string },
-    ) =>
-      a.book === b.book &&
-      a.chapter === b.chapter &&
-      a.verse === b.verse,
+    ) => a.book === b.book && a.chapter === b.chapter && a.verse === b.verse,
     [],
   );
 
@@ -158,17 +155,24 @@ export function Interlinearizer() {
       | { type: "link"; occIndex: number; isLinked: boolean }
     > = [];
 
+    const isPunctuationGroup = (gi: number) =>
+      linkedGroups[gi].occurrences.every((o) => o.isPunctuation);
+
     for (let gi = 0; gi < linkedGroups.length; gi++) {
       items.push({ type: "group", groupIndex: gi });
 
       if (gi < linkedGroups.length - 1) {
         const group = linkedGroups[gi];
         const lastOccIndex = group.startIndex + group.occurrences.length - 1;
-        items.push({
-          type: "link",
-          occIndex: lastOccIndex,
-          isLinked: occurrences[lastOccIndex].linkedWithNext,
-        });
+        // Skip punctuation boundaries for linking UI.
+        // Punctuation stays visible as plain text groups between words.
+        if (!isPunctuationGroup(gi) && !isPunctuationGroup(gi + 1)) {
+          items.push({
+            type: "link",
+            occIndex: lastOccIndex,
+            isLinked: occurrences[lastOccIndex].linkedWithNext,
+          });
+        }
       }
     }
 
@@ -228,9 +232,36 @@ export function Interlinearizer() {
                 const gi = item.groupIndex;
                 const group = linkedGroups[gi];
                 const isActive = gi === activeGroupIndex;
+                const isPunctuationGroup = group.occurrences.every(
+                  (o) => o.isPunctuation,
+                );
                 const distance = Math.abs(gi - activeGroupIndex);
                 // 5% opacity reduction per occurrence distance, minimum 15%
                 const opacity = Math.max(0.15, 1 - distance * 0.05);
+
+                if (isPunctuationGroup) {
+                  return (
+                    <div
+                      key={`group-${group.startIndex}`}
+                      ref={(el) => {
+                        if (el) {
+                          groupRefs.current.set(gi, el);
+                        } else {
+                          groupRefs.current.delete(gi);
+                        }
+                      }}
+                      className={cn(
+                        "shrink-0 px-2 py-2 text-sm font-mono text-muted-foreground select-none",
+                        !isActive && "cursor-pointer",
+                        isActive && "rounded bg-sky-100 text-foreground",
+                      )}
+                      style={{ opacity: isActive ? 1 : opacity }}
+                      onClick={!isActive ? () => clickGroup(gi) : undefined}
+                    >
+                      {group.occurrences.map((o) => o.text).join("")}
+                    </div>
+                  );
+                }
 
                 return (
                   <div
@@ -342,8 +373,10 @@ export function Interlinearizer() {
                 const nextOcc =
                   seg.occurrences[oi + 1] ?? segments[si + 1]?.occurrences[0];
                 const isLastToken =
-                  si === segments.length - 1 && oi === seg.occurrences.length - 1;
-                const nextIsPunct = nextOcc?.type === OccurrenceType.Punctuation;
+                  si === segments.length - 1 &&
+                  oi === seg.occurrences.length - 1;
+                const nextIsPunct =
+                  nextOcc?.type === OccurrenceType.Punctuation;
 
                 return (
                   <span
@@ -356,7 +389,9 @@ export function Interlinearizer() {
                       !approved && !isInActiveGroup && "text-muted-foreground",
                     )}
                     onClick={() => groupIndex !== -1 && fadeToGroup(groupIndex)}
-                    onDoubleClick={() => splitSegmentAtOccurrence(seg.id, occ.id)}
+                    onDoubleClick={() =>
+                      splitSegmentAtOccurrence(seg.id, occ.id)
+                    }
                   >
                     {occ.surfaceText}
                     {!isLastToken && !isPunct && !nextIsPunct && " "}
@@ -374,10 +409,7 @@ export function Interlinearizer() {
             const segIsMerged = !sameBcv(seg.startRef, seg.endRef);
             const nextSegIsMerged =
               si < segments.length - 1
-                ? !sameBcv(
-                    segments[si + 1].startRef,
-                    segments[si + 1].endRef,
-                  )
+                ? !sameBcv(segments[si + 1].startRef, segments[si + 1].endRef)
                 : false;
 
             return (
@@ -465,7 +497,7 @@ export function Interlinearizer() {
                       size="icon-sm"
                       onClick={() => mergeSegments(seg.id, segments[si + 1].id)}
                       aria-label="Merge with next segment"
-                      disabled={segIsMerged || nextSegIsMerged}
+                      disabled={nextSegIsMerged}
                       className="h-4 w-4 text-muted-foreground/40 hover:text-muted-foreground disabled:opacity-20"
                     >
                       <Link2 className="size-3" />

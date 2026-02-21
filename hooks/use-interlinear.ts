@@ -178,6 +178,14 @@ export function useInterlinear() {
       setOccurrences((prev) => {
         const next = [...prev];
 
+        // Skip punctuation boundaries for linking.
+        if (
+          next[occIndex]?.isPunctuation ||
+          next[occIndex + 1]?.isPunctuation
+        ) {
+          return next;
+        }
+
         // If already linked here, just unlink (simple toggle)
         if (next[occIndex].linkedWithNext) {
           next[occIndex] = { ...next[occIndex], linkedWithNext: false };
@@ -210,13 +218,17 @@ export function useInterlinear() {
           // Link is to the right of the active group.
           // Bridge from activeEnd through occIndex.
           for (let i = activeEnd; i <= occIndex; i++) {
-            next[i] = { ...next[i], linkedWithNext: true };
+            if (!next[i]?.isPunctuation && !next[i + 1]?.isPunctuation) {
+              next[i] = { ...next[i], linkedWithNext: true };
+            }
           }
         } else if (occIndex + 1 < activeGroup.startIndex) {
           // Link is to the left of the active group.
           // Bridge from occIndex through activeGroup.startIndex - 1.
           for (let i = occIndex; i < activeGroup.startIndex; i++) {
-            next[i] = { ...next[i], linkedWithNext: true };
+            if (!next[i]?.isPunctuation && !next[i + 1]?.isPunctuation) {
+              next[i] = { ...next[i], linkedWithNext: true };
+            }
           }
         } else {
           // Inside the active group — simple toggle
@@ -279,8 +291,8 @@ export function useInterlinear() {
       if (prev[i1 + 1].id !== segId2) return prev;
       const a = prev[i1];
       const b = prev[i1 + 1];
-      if (isMergedSegment(a) || isMergedSegment(b)) {
-        return prev; // don't merge already-merged segments
+      if (isMergedSegment(b)) {
+        return prev; // allow extending a merged segment forward, but avoid merging into already-merged next segment
       }
       const mergedId = a.id;
       const mergedOccurrences = [...a.occurrences, ...b.occurrences].map(
