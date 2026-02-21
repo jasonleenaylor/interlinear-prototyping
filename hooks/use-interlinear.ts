@@ -42,8 +42,15 @@ function sameRef(
   );
 }
 
+function sameBcv(
+  a: CanonicalSegment["startRef"],
+  b: CanonicalSegment["startRef"],
+): boolean {
+  return a.book === b.book && a.chapter === b.chapter && a.verse === b.verse;
+}
+
 function isMergedSegment(seg: CanonicalSegment): boolean {
-  return !sameRef(seg.startRef, seg.endRef);
+  return !sameBcv(seg.startRef, seg.endRef);
 }
 
 export function useInterlinear() {
@@ -79,6 +86,7 @@ export function useInterlinear() {
   const [segments, setSegments] = useState<CanonicalSegment[]>(
     () => sampleInterlinearization.books[0]?.segments ?? [],
   );
+  const splitIdCounterRef = useRef(0);
 
   // O(1) lookup: canonical occurrence ID → group index.
   // Used by the source text click handlers — eliminates positional findIndex drift.
@@ -292,6 +300,98 @@ export function useInterlinear() {
     });
   }, []);
 
+  /**
+   * Split a segment immediately before the given occurrence.
+   * - punctuation targets split at the next word (so users can split after punctuation)
+   * - no-op when occurrence is first in segment
+   */
+  const splitSegmentAtOccurrence = useCallback(
+    (segmentId: string, occurrenceId: string) => {
+      let createdRightId: string | null = null;
+
+      setSegments((prev) => {
+        const segIndex = prev.findIndex((s) => s.id === segmentId);
+        if (segIndex === -1) return prev;
+
+        const seg = prev[segIndex];
+        const clickedIndex = seg.occurrences.findIndex(
+          (o) => o.id === occurrenceId,
+        );
+        if (clickedIndex < 0) return prev;
+
+        let splitAt = clickedIndex;
+        if (seg.occurrences[clickedIndex].type !== "word") {
+          // Double-click on punctuation means "split after punctuation":
+          // move to the next word occurrence and split before it.
+          splitAt = seg.occurrences.findIndex(
+            (o, i) => i > clickedIndex && o.type === "word",
+          );
+          if (splitAt === -1) return prev;
+        }
+
+        if (splitAt <= 0) return prev;
+
+        const leftOcc = seg.occurrences.slice(0, splitAt).map((o, i) => ({
+          ...o,
+          segmentId: seg.id,
+          index: i,
+        }));
+
+        const rightId = `${seg.id}~split~${++splitIdCounterRef.current}`;
+        createdRightId = rightId;
+        const rightOcc = seg.occurrences.slice(splitAt).map((o, i) => ({
+          ...o,
+          segmentId: rightId,
+          index: i,
+        }));
+
+        const sameVerseRange = sameBcv(seg.startRef, seg.endRef);
+        const leftEnd = sameVerseRange
+          ? { ...seg.startRef, fragment: "a" }
+          : seg.startRef;
+        const rightStart = sameVerseRange
+          ? { ...seg.startRef, fragment: "b" }
+          : seg.endRef;
+        const rightEnd = sameVerseRange
+          ? { ...seg.endRef, fragment: "b" }
+          : seg.endRef;
+
+        const leftSeg: CanonicalSegment = {
+          ...seg,
+          endRef: leftEnd,
+          occurrences: leftOcc,
+        };
+
+        const rightSeg: CanonicalSegment = {
+          ...seg,
+          id: rightId,
+          startRef: rightStart,
+          endRef: rightEnd,
+          occurrences: rightOcc,
+          literalTranslation: undefined,
+          freeTranslation: undefined,
+        };
+
+        return [
+          ...prev.slice(0, segIndex),
+          leftSeg,
+          rightSeg,
+          ...prev.slice(segIndex + 1),
+        ];
+      });
+
+      // Keep left translation values; right starts empty.
+      if (createdRightId) {
+        const rightId = createdRightId;
+        setSegmentTranslations((prev) => ({
+          ...prev,
+          [rightId]: { literal: "", free: "" },
+        }));
+      }
+    },
+    [],
+  );
+
   const canGoBack = activeGroupIndex > 0;
   const canGoForward = activeGroupIndex < linkedGroups.length - 1;
 
@@ -314,6 +414,7 @@ export function useInterlinear() {
     updateFreeTranslation,
     copyGlossesToLiteral,
     mergeSegments,
+    splitSegmentAtOccurrence,
     moveForward,
     moveBackward,
     toggleApprove,

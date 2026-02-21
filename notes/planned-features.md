@@ -203,7 +203,7 @@ matching the pre-F-05 appearance.
 
 ## F-08 · Copy glosses into literal translation
 
-**Status:** pending
+**Status:** done — committed
 
 ### UI
 When **Show literal translation** is enabled, each segment's literal translation textarea
@@ -226,7 +226,7 @@ punctuation tokens that have no gloss.
 
 ## F-09 · Double-click between occurrences to split a segment
 
-**Status:** pending
+**Status:** done — committed
 
 ### UI
 The user double-clicks on a **word token span** in the text area. The segment that
@@ -237,14 +237,56 @@ one containing the clicked token and all tokens after it.
 ### Behaviour
 - Only word tokens are splittable (double-clicking punctuation is a no-op).
 - A segment cannot be split at its first token (there would be nothing in the left half).
-- The new left segment inherits the original `segmentRef`; the right segment gets a
-  derived ref (e.g. `GEN 1:1` → `GEN 1:1a` / `GEN 1:1b`) or a placeholder until a
-  future editing feature allows renaming.
-- Existing `literalTranslation` and `freeTranslation` values are copied to the left
-  segment; the right segment starts with empty translations.
-- Splitting a merged segment (one with `linkedSegmentRefs`) is not allowed — the user
-  must unlink it first.
+- The split occurs immediately before the double-clicked token.
+- For single-verse ranges, BCVF fragment markers are used (`a` for left end, `b` for
+  right start/end). For multi-verse ranges, placeholder refs are used (left collapses to
+  `startRef`, right collapses to `endRef`) until a future ref-editing feature.
+- Existing `literalTranslation` and `freeTranslation` values stay on the left segment;
+  the right segment starts with empty translations.
+- All right-side occurrences are reassigned to the new right segment ID and re-indexed;
+  left-side occurrences are re-indexed under the original segment ID.
 - This is the inverse operation of F-06 merging, but implemented independently (F-06
   uses explicit link/unlink icons; F-09 uses double-click on a token boundary).
 
 **Files:** `components/interlinearizer.tsx`, `hooks/use-interlinear.ts`
+
+---
+
+## B-01 · Cannot merge merged segment forward
+
+**Type:** bug  
+**Status:** pending
+
+### Description
+After merging two adjacent segments (A + B), the newly merged segment cannot be merged
+again with the following segment (C). The merge button remains disabled, which prevents
+building a longer contiguous merged range (A + B + C).
+
+### Expected
+A merged segment should still be eligible to merge with its immediate next segment,
+as long as order remains adjacent and in sequence.
+
+**Likely files:** `components/interlinearizer.tsx`, `hooks/use-interlinear.ts`
+
+---
+
+## F-10 · Render punctuation as plain text in interlinear flow
+
+**Status:** pending
+
+### Goal
+Punctuation occurrences should remain visible in the source text flow but should not
+render as full analysis boxes. Instead, show punctuation as plain text separators
+between non-punctuation occurrences.
+
+### Behaviour
+- In the interlinear strip, punctuation occurrences render as plain text only
+  (no gloss row, no morpheme editor, no approve control).
+- Linking actions skip punctuation boundaries. A link operation between two words should
+  bridge across any punctuation occurrences between them.
+- Punctuation still appears visually between neighbouring non-punctuation words so token
+  order remains faithful to the source text.
+- Word click navigation and fade behaviour remain unchanged.
+
+**Files:** `components/interlinearizer.tsx`, `components/occurrence-box.tsx`,
+`hooks/use-interlinear.ts`, `lib/interlinear-types.ts`

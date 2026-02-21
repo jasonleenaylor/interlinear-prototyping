@@ -37,6 +37,7 @@ export function Interlinearizer() {
     updateFreeTranslation,
     copyGlossesToLiteral,
     mergeSegments,
+    splitSegmentAtOccurrence,
     moveForward,
     moveBackward,
     toggleApprove,
@@ -63,15 +64,14 @@ export function Interlinearizer() {
   const [translateX, setTranslateX] = useState(0);
   const [isFading, setIsFading] = useState(false);
 
-  const sameRef = useCallback(
+  const sameBcv = useCallback(
     (
       a: { book: string; chapter: number; verse: number; fragment?: string },
       b: { book: string; chapter: number; verse: number; fragment?: string },
     ) =>
       a.book === b.book &&
       a.chapter === b.chapter &&
-      a.verse === b.verse &&
-      (a.fragment ?? "") === (b.fragment ?? ""),
+      a.verse === b.verse,
     [],
   );
 
@@ -356,6 +356,7 @@ export function Interlinearizer() {
                       !approved && !isInActiveGroup && "text-muted-foreground",
                     )}
                     onClick={() => groupIndex !== -1 && fadeToGroup(groupIndex)}
+                    onDoubleClick={() => splitSegmentAtOccurrence(seg.id, occ.id)}
                   >
                     {occ.surfaceText}
                     {!isLastToken && !isPunct && !nextIsPunct && " "}
@@ -370,10 +371,13 @@ export function Interlinearizer() {
         {/* Segment layout mode (translation lines visible) */}
         {(textConfig.showLiteral || textConfig.showFree) &&
           segments.map((seg, si) => {
-            const segIsMerged = !sameRef(seg.startRef, seg.endRef);
+            const segIsMerged = !sameBcv(seg.startRef, seg.endRef);
             const nextSegIsMerged =
               si < segments.length - 1
-                ? !sameRef(segments[si + 1].startRef, segments[si + 1].endRef)
+                ? !sameBcv(
+                    segments[si + 1].startRef,
+                    segments[si + 1].endRef,
+                  )
                 : false;
 
             return (
@@ -409,6 +413,9 @@ export function Interlinearizer() {
                           )}
                           onClick={() =>
                             groupIndex !== -1 && fadeToGroup(groupIndex)
+                          }
+                          onDoubleClick={() =>
+                            splitSegmentAtOccurrence(seg.id, occ.id)
                           }
                         >
                           {occ.surfaceText}
