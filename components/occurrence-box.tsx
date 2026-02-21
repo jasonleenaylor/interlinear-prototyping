@@ -1,6 +1,6 @@
 "use client";
 
-import { type LinkedGroup } from "@/lib/interlinear-types";
+import { type LinkedGroup, type Occurrence } from "@/lib/interlinear-types";
 import { MorphemeEditor } from "@/components/morpheme-editor";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,6 +20,8 @@ interface OccurrenceBoxProps {
   onUnlink: (occIndex: number) => void;
   canGoBack: boolean;
   canGoForward: boolean;
+  /** Non-adjacent occurrences linked to this group — shown grayed out, not analyzable. */
+  disjointOccurrences?: Occurrence[];
 }
 
 export function OccurrenceBox({
@@ -34,6 +36,7 @@ export function OccurrenceBox({
   onUnlink,
   canGoBack,
   canGoForward,
+  disjointOccurrences,
 }: OccurrenceBoxProps) {
   const allApproved = group.occurrences.every((o) => o.approved);
   // Gloss is stored on the first occurrence of the group
@@ -78,6 +81,17 @@ export function OccurrenceBox({
                 </div>
               </button>
             )}
+          </div>
+        ))}
+        {/* Non-adjacent linked occurrences — surface text only, grayed out like punctuation */}
+        {disjointOccurrences?.map((occ) => (
+          <div key={`disjoint-${occ.id}`} className="relative shrink-0">
+            <div
+              data-testid="disjoint-occ-token"
+              className="mx-0.5 px-1.5 py-0.5 text-center font-mono text-base font-semibold text-muted-foreground/60 rounded border border-dashed border-muted-foreground/25 bg-muted/20 select-none"
+            >
+              {occ.text}
+            </div>
           </div>
         ))}
       </div>

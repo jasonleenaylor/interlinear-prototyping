@@ -24,12 +24,14 @@ import { useTextConfig } from "@/hooks/use-text-config";
  */
 
 const ACTIVE_LEFT_PX = 340; // fixed x-position of the active group's left edge
+const ARC_PEAK_PX = 32;     // how far above the group box tops the arc peaks
 
 export function Interlinearizer() {
   const {
     occurrences,
     activeGroupIndex,
     linkedGroups,
+    disjointLinks,
     segments,
     occurrenceGroupMap,
     segmentTranslations,
@@ -63,6 +65,12 @@ export function Interlinearizer() {
 
   const [translateX, setTranslateX] = useState(0);
   const [isFading, setIsFading] = useState(false);
+  // SVG arc paths for disjoint links
+  const [arcPaths, setArcPaths] = useState<{ key: string; d: string; isActive: boolean }[]>([]);
+  // Incremented by transitionend so the arc useEffect re-fires after the strip
+  // slide animation completes, ensuring arc coordinates use final DOM positions.
+  const [arcTick, setArcTick] = useState(0);
+  const stripContainerRef = useRef<HTMLDivElement>(null);
 
   const sameBcv = useCallback(
     (
@@ -142,6 +150,68 @@ export function Interlinearizer() {
     recalcTranslate();
   }, [recalcTranslate, linkedGroups.length]);
 
+  // Recompute arc paths whenever disjoint links, translate, or groups change
+  useEffect(() => {
+    if (disjointLinks.size === 0) {
+      setArcPaths([]);
+      return;
+    }
+    const container = stripContainerRef.current;
+    if (!container) return;
+    const containerRect = container.getBoundingClientRect();
+
+    const paths: { key: string; d: string; isActive: boolean }[] = [];
+
+    for (const key of disjointLinks) {
+      const [leftOccStr, rightOccStr] = key.split(":");
+      const leftOcc = parseInt(leftOccStr, 10);
+      const rightOcc = parseInt(rightOccStr, 10);
+
+      // Find which groups these occurrences belong to
+      const leftGi = linkedGroups.findIndex(
+        (g) => leftOcc >= g.startIndex && leftOcc < g.startIndex + g.occurrences.length,
+      );
+      const rightGi = linkedGroups.findIndex(
+        (g) => rightOcc >= g.startIndex && rightOcc < g.startIndex + g.occurrences.length,
+      );
+      if (leftGi < 0 || rightGi < 0) continue;
+
+      const leftEl = groupRefs.current.get(leftGi);
+      const rightEl = groupRefs.current.get(rightGi);
+      if (!leftEl || !rightEl) continue;
+
+      const leftRect = leftEl.getBoundingClientRect();
+      const rightRect = rightEl.getBoundingClientRect();
+
+      // x: measured from containerRect.left (arcWrapper left edge)
+      // y: measured from containerRect.top (arcWrapper top, above the pt padding)
+      //    so group boxes sit at y ≈ ARC_HEIGHT_PX + strip padding
+      const x1 = leftRect.right - containerRect.left;
+      const x2 = rightRect.left - containerRect.left;
+      const y1 = leftRect.top - containerRect.top + 8;
+      const y2 = rightRect.top - containerRect.top + 8;
+      const midY = Math.min(y1, y2) - ARC_PEAK_PX; // arc peak above box tops (negative y = above container, overflow-y visible lets it show)
+      const cpX1 = x1 + (x2 - x1) * 0.25;
+      const cpX2 = x1 + (x2 - x1) * 0.75;
+
+      const d = `M ${x1} ${y1} C ${cpX1} ${midY}, ${cpX2} ${midY}, ${x2} ${y2}`;
+      const isActive = leftGi === activeGroupIndex || rightGi === activeGroupIndex;
+      paths.push({ key, d, isActive });
+    }
+
+    setArcPaths(paths);
+  }, [disjointLinks, translateX, linkedGroups, activeGroupIndex, arcTick]);
+
+  // After the strip slide transition ends, bump arcTick so the arc useEffect
+  // re-fires with final DOM positions (avoiding stale mid-transition coords).
+  useEffect(() => {
+    const strip = stripRef.current;
+    if (!strip) return;
+    const onTransitionEnd = () => setArcTick((t) => t + 1);
+    strip.addEventListener("transitionend", onTransitionEnd);
+    return () => strip.removeEventListener("transitionend", onTransitionEnd);
+  }, []);
+
   // Also recalculate after DOM paints (elements may resize after linking/unlinking)
   useEffect(() => {
     const id = requestAnimationFrame(recalcTranslate);
@@ -179,6 +249,51 @@ export function Interlinearizer() {
     return items;
   }, [linkedGroups, occurrences]);
 
+  /**
+   * Every group index that is an endpoint of any disjoint link.
+   * Stable across navigation — depends only on the links themselves, not activeGroupIndex.
+   */
+  const ghostGroupIndices = useMemo(() => {
+    // Only RIGHT-endpoint groups are ghost chips — always, regardless of which
+    // group is active.  Left-endpoint groups render as normal (faded) inactive
+    // groups so the user can see and click on the analysis they belong to.
+    const result = new Set<number>();
+    for (const key of disjointLinks) {
+      const rOcc = parseInt(key.split(":")[1], 10);
+      const rGi = linkedGroups.findIndex(
+        (g) => rOcc >= g.startIndex && rOcc < g.startIndex + g.occurrences.length,
+      );
+      if (rGi !== -1) result.add(rGi);
+    }
+    return result;
+  }, [disjointLinks, linkedGroups]);
+
+  /**
+   * Map from group index → partner occurrences for every LEFT-endpoint group.
+   * These are shown grayed-out inside the analysis box whether or not the
+   * group is currently active, so the linked word is always visible.
+   */
+  const disjointOccsPerGroup = useMemo(() => {
+    const map = new Map<number, Occurrence[]>();
+    if (disjointLinks.size === 0) return map;
+    for (const key of disjointLinks) {
+      const [lStr, rStr] = key.split(":");
+      const l = parseInt(lStr, 10);
+      const r = parseInt(rStr, 10);
+      // Left endpoint group: the one whose last occurrence index === l
+      const lGi = linkedGroups.findIndex(
+        (g) => g.startIndex + g.occurrences.length - 1 === l,
+      );
+      // Right endpoint group: the one whose first occurrence index === r
+      const rGi = linkedGroups.findIndex((g) => g.startIndex === r);
+      if (lGi !== -1 && rGi !== -1) {
+        const existing = map.get(lGi) ?? [];
+        map.set(lGi, [...existing, ...linkedGroups[rGi].occurrences]);
+      }
+    }
+    return map;
+  }, [disjointLinks, linkedGroups]);
+
   return (
     <div className="flex flex-col gap-4 w-full">
       {/* Legend */}
@@ -209,13 +324,33 @@ export function Interlinearizer() {
       {/* Strip + optional settings panel side-by-side */}
       <div className="flex items-start gap-2">
         <div
+          ref={stripContainerRef}
           className={cn(
-            "overflow-hidden relative flex-1 transition-opacity duration-200",
+            "[overflow-x:clip] overflow-y-visible relative flex-1 transition-opacity duration-200",
             isFading && "opacity-0",
           )}
           role="region"
           aria-label="Scripture interlinear view"
         >
+          {/* Disjoint link arc overlay — SVG overflow-visible + overflow-y-visible on container lets arcs draw above the strip */}
+          {arcPaths.length > 0 && (
+            <svg
+              className="absolute inset-0 w-full h-full pointer-events-none overflow-visible"
+              style={{ zIndex: 10 }}
+            >
+              {arcPaths.map(({ key, d, isActive }) => (
+                <path
+                  key={key}
+                  d={d}
+                  fill="none"
+                  stroke={isActive ? "rgb(14,165,233)" : "rgb(148,163,184)"}
+                  strokeWidth={isActive ? 2 : 1.5}
+                  strokeDasharray={isActive ? undefined : "4 3"}
+                  opacity={isActive ? 0.9 : 0.5}
+                />
+              ))}
+            </svg>
+          )}
           {/* Translating strip */}
           <div
             ref={stripRef}
@@ -243,6 +378,7 @@ export function Interlinearizer() {
                   return (
                     <div
                       key={`group-${group.startIndex}`}
+                      data-group-start={group.startIndex}
                       ref={(el) => {
                         if (el) {
                           groupRefs.current.set(gi, el);
@@ -263,9 +399,33 @@ export function Interlinearizer() {
                   );
                 }
 
+                // Ghost: part of a disjoint link but not the active group — non-interactive gray chip
+                if (ghostGroupIndices.has(gi)) {
+                  return (
+                    <div
+                      key={`group-${group.startIndex}`}
+                      data-group-start={group.startIndex}
+                      data-testid="disjoint-ghost-chip"
+                      ref={(el) => {
+                        if (el) {
+                          groupRefs.current.set(gi, el);
+                        } else {
+                          groupRefs.current.delete(gi);
+                        }
+                      }}
+                      className="shrink-0 px-2 py-2 text-sm font-mono text-muted-foreground/50 select-none border border-dashed border-muted-foreground/25 rounded"
+                      style={{ opacity }}
+                    >
+                      {group.occurrences.map((o) => o.text).join(" ")}
+                    </div>
+                  );
+                }
+
                 return (
                   <div
                     key={`group-${group.startIndex}`}
+                    data-group-start={group.startIndex}
+                    data-active={isActive ? "true" : undefined}
                     ref={(el) => {
                       if (el) {
                         groupRefs.current.set(gi, el);
@@ -289,6 +449,7 @@ export function Interlinearizer() {
                       onUnlink={toggleLink}
                       canGoBack={canGoBack}
                       canGoForward={canGoForward}
+                      disjointOccurrences={disjointOccsPerGroup.get(gi)}
                     />
                   </div>
                 );

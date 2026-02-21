@@ -59,6 +59,13 @@ export function useInterlinear() {
   );
   const [activeIndex, setActiveIndex] = useState(0);
 
+  // Disjoint (non-contiguous) links stored as "leftLastOccIdx:rightFirstOccIdx" strings.
+  // The linked occurrence is shown inside the active group's OccurrenceBox (grayed out,
+  // non-analyzable — like punctuation), and a curved arc connects it visually in the strip.
+  const [disjointLinks, setDisjointLinks] = useState<Set<string>>(
+    () => new Set(),
+  );
+
   const [segmentTranslations, setSegmentTranslations] = useState<
     Record<string, { literal: string; free: string }>
   >(buildInitialTranslations);
@@ -74,6 +81,20 @@ export function useInterlinear() {
   useEffect(() => {
     linkedGroupsRef.current = linkedGroups;
   }, [linkedGroups]);
+
+  // Keep a ref to disjointLinks so navigation callbacks can read current links
+  // without becoming stale.
+  const disjointLinksRef = useRef(disjointLinks);
+  useEffect(() => {
+    disjointLinksRef.current = disjointLinks;
+  }, [disjointLinks]);
+
+  // The set of startIndex values that are disjoint RIGHT-endpoint groups.
+  // These groups are treated like punctuation: visible but not navigable.
+  const disjointRightStarts = useMemo(
+    () => new Set([...disjointLinks].map((k) => parseInt(k.split(":")[1], 10))),
+    [disjointLinks],
+  );
 
   // Find which group the active index belongs to
   const activeGroupIndex = linkedGroups.findIndex(
@@ -103,28 +124,44 @@ export function useInterlinear() {
   const moveForward = useCallback(() => {
     setActiveIndex((prev) => {
       const groups = linkedGroupsRef.current;
+      const links = disjointLinksRef.current;
+      const rightStarts = new Set([...links].map((k) => parseInt(k.split(":")[1], 10)));
       const currentGroupIdx = groups.findIndex(
         (g) =>
           prev >= g.startIndex && prev < g.startIndex + g.occurrences.length,
       );
-      if (currentGroupIdx < groups.length - 1) {
-        return groups[currentGroupIdx + 1].startIndex;
+      // Skip forward over punctuation-only and disjoint right-endpoint groups
+      let nextIdx = currentGroupIdx + 1;
+      while (
+        nextIdx < groups.length &&
+        (groups[nextIdx].occurrences.every((o) => o.isPunctuation) ||
+          rightStarts.has(groups[nextIdx].startIndex))
+      ) {
+        nextIdx++;
       }
-      return prev;
+      return nextIdx < groups.length ? groups[nextIdx].startIndex : prev;
     });
   }, []);
 
   const moveBackward = useCallback(() => {
     setActiveIndex((prev) => {
       const groups = linkedGroupsRef.current;
+      const links = disjointLinksRef.current;
+      const rightStarts = new Set([...links].map((k) => parseInt(k.split(":")[1], 10)));
       const currentGroupIdx = groups.findIndex(
         (g) =>
           prev >= g.startIndex && prev < g.startIndex + g.occurrences.length,
       );
-      if (currentGroupIdx > 0) {
-        return groups[currentGroupIdx - 1].startIndex;
+      // Skip backward over punctuation-only and disjoint right-endpoint groups
+      let prevIdx = currentGroupIdx - 1;
+      while (
+        prevIdx >= 0 &&
+        (groups[prevIdx].occurrences.every((o) => o.isPunctuation) ||
+          rightStarts.has(groups[prevIdx].startIndex))
+      ) {
+        prevIdx--;
       }
-      return prev;
+      return prevIdx >= 0 ? groups[prevIdx].startIndex : prev;
     });
   }, []);
 
@@ -175,70 +212,67 @@ export function useInterlinear() {
 
   const toggleLink = useCallback(
     (occIndex: number) => {
-      setOccurrences((prev) => {
-        const next = [...prev];
+      const occs = occurrences;
 
-        // Skip punctuation boundaries for linking.
-        if (
-          next[occIndex]?.isPunctuation ||
-          next[occIndex + 1]?.isPunctuation
-        ) {
-          return next;
-        }
+      // Skip punctuation boundaries for linking.
+      if (occs[occIndex]?.isPunctuation || occs[occIndex + 1]?.isPunctuation) {
+        return;
+      }
 
-        // If already linked here, just unlink (simple toggle)
-        if (next[occIndex].linkedWithNext) {
+      // If already linked here (adjacent chain), just unlink.
+      if (occs[occIndex].linkedWithNext) {
+        setOccurrences((prev) => {
+          const next = [...prev];
           next[occIndex] = { ...next[occIndex], linkedWithNext: false };
           return next;
-        }
+        });
+        return;
+      }
 
-        // The link sits between occIndex and occIndex+1.
-        // Determine which side faces the active group so we know
-        // which neighbour to merge into the active group.
-        const groups = linkedGroupsRef.current;
-        const activeGroup = groups[activeGroupIndex];
-        if (!activeGroup) {
-          // Fallback: simple adjacent link
+      const groups = linkedGroupsRef.current;
+      const activeGroup = groups[activeGroupIndex];
+      if (!activeGroup) {
+        // Fallback: simple adjacent link
+        setOccurrences((prev) => {
+          const next = [...prev];
           next[occIndex] = { ...next[occIndex], linkedWithNext: true };
           return next;
-        }
+        });
+        return;
+      }
 
-        const activeEnd =
-          activeGroup.startIndex + activeGroup.occurrences.length - 1;
+      const activeEnd =
+        activeGroup.startIndex + activeGroup.occurrences.length - 1;
 
-        // Adjacent link — just set the flag
-        if (occIndex === activeEnd || occIndex + 1 === activeGroup.startIndex) {
+      // Adjacent link — just set the flag
+      if (occIndex === activeEnd || occIndex + 1 === activeGroup.startIndex) {
+        setOccurrences((prev) => {
+          const next = [...prev];
           next[occIndex] = { ...next[occIndex], linkedWithNext: true };
           return next;
-        }
+        });
+        return;
+      }
 
-        // Non-contiguous: link the neighbour on the active-group side
-        // into the active group by bridging all occurrences in between.
-        if (occIndex > activeEnd) {
-          // Link is to the right of the active group.
-          // Bridge from activeEnd through occIndex.
-          for (let i = activeEnd; i <= occIndex; i++) {
-            if (!next[i]?.isPunctuation && !next[i + 1]?.isPunctuation) {
-              next[i] = { ...next[i], linkedWithNext: true };
-            }
-          }
-        } else if (occIndex + 1 < activeGroup.startIndex) {
-          // Link is to the left of the active group.
-          // Bridge from occIndex through activeGroup.startIndex - 1.
-          for (let i = occIndex; i < activeGroup.startIndex; i++) {
-            if (!next[i]?.isPunctuation && !next[i + 1]?.isPunctuation) {
-              next[i] = { ...next[i], linkedWithNext: true };
-            }
-          }
+      // Non-contiguous: create/remove a disjoint link between the two groups.
+      // Key: last occ index of left group : first occ index of right group
+      const leftLastOcc =
+        occIndex < activeGroup.startIndex ? occIndex : activeEnd;
+      const rightFirstOcc =
+        occIndex < activeGroup.startIndex ? activeGroup.startIndex : occIndex + 1;
+      const key = `${leftLastOcc}:${rightFirstOcc}`;
+
+      setDisjointLinks((prev) => {
+        const next = new Set(prev);
+        if (next.has(key)) {
+          next.delete(key);
         } else {
-          // Inside the active group — simple toggle
-          next[occIndex] = { ...next[occIndex], linkedWithNext: true };
+          next.add(key);
         }
-
         return next;
       });
     },
-    [activeGroupIndex],
+    [occurrences, activeGroupIndex],
   );
 
   const updateLiteralTranslation = useCallback(
@@ -404,8 +438,20 @@ export function useInterlinear() {
     [],
   );
 
-  const canGoBack = activeGroupIndex > 0;
-  const canGoForward = activeGroupIndex < linkedGroups.length - 1;
+  const canGoBack = linkedGroups
+    .slice(0, activeGroupIndex)
+    .some(
+      (g) =>
+        !g.occurrences.every((o) => o.isPunctuation) &&
+        !disjointRightStarts.has(g.startIndex),
+    );
+  const canGoForward = linkedGroups
+    .slice(activeGroupIndex + 1)
+    .some(
+      (g) =>
+        !g.occurrences.every((o) => o.isPunctuation) &&
+        !disjointRightStarts.has(g.startIndex),
+    );
 
   /** Jump directly to a group by its group index. */
   const goToGroup = useCallback((groupIndex: number) => {
@@ -419,6 +465,7 @@ export function useInterlinear() {
     activeIndex,
     activeGroupIndex,
     linkedGroups,
+    disjointLinks,
     segments,
     occurrenceGroupMap,
     segmentTranslations,

@@ -351,7 +351,7 @@ fit on screen with less scrolling while preserving readability and editability.
 
 ## F-11 · Link disjoint occurrences without auto-linking intermediates
 
-**Status:** pending
+**Status:** done (awaiting manual verification before commit)
 
 ### Goal
 Allow users to link two non-adjacent occurrences directly without forcing all
@@ -365,6 +365,13 @@ intermediate occurrences into the same link chain.
 - The connector should attach to the nearest facing corners/edges of the two occurrence
   boxes and remain visually stable while scrolling and fading.
 - Existing adjacent linking/unlinking behaviour remains supported.
+
+### Resolution
+- Added `disjointLinks: Set<string>` state (pairs encoded as `"leftOccIdx:rightOccIdx"`).
+- Non-adjacent `toggleLink` now creates/removes a disjoint link instead of bridging intermediates.
+- An SVG overlay inside the strip container draws cubic Bézier arcs between the
+  nearest edges of the two linked groups.
+- Active-group arcs render in sky-500; inactive arcs render in slate-400 dashed.
 
 **Likely files:** `lib/interlinear-types.ts`, `hooks/use-interlinear.ts`,
 `components/interlinearizer.tsx`, `components/occurrence-box.tsx`
