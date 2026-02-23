@@ -403,7 +403,7 @@ skipping over the punctuation entirely.
 
 ## F-13 · Auto-group adjacent occurrence when linking into an existing disjoint set
 
-**Status:** pending
+**Status:** done — committed
 
 ### Goal
 If a user creates an adjacent link between an occurrence and an occurrence that is

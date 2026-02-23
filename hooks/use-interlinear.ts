@@ -260,8 +260,62 @@ export function useInterlinear() {
       const activeEnd =
         activeGroup.startIndex + activeGroup.occurrences.length - 1;
 
-      // Adjacent link — just set the flag
+      // Adjacent link — set the flag and update any disjoint link keys that
+      // referenced the boundaries now being merged.
       if (occIndex === activeEnd || occIndex + 1 === activeGroup.startIndex) {
+        // Determine the boundary indices of the two groups being merged.
+        // Key format: "leftGroupLastOcc:rightGroupFirstOcc".
+        const leftLastOcc = occIndex;       // last occ of the left group (l1)
+        const rightFirstOcc = occIndex + 1; // first occ of the right group (s2)
+
+        // Find the left and right group objects to know the full new extent.
+        const leftGroup = groups.find(
+          (g) => g.startIndex + g.occurrences.length - 1 === leftLastOcc,
+        );
+        const rightGroup = groups.find((g) => g.startIndex === rightFirstOcc);
+        // After merge: merged group startIndex = s1 (left group's start),
+        //              merged group lastOcc     = l2 (right group's last occ).
+        const mergedStart = leftGroup?.startIndex ?? leftLastOcc;
+        const mergedEnd =
+          rightGroup !== undefined
+            ? rightGroup.startIndex + rightGroup.occurrences.length - 1
+            : rightFirstOcc;
+
+        // Update or remove any disjoint link keys that cross the merged boundary.
+        // Three cases:
+        //   1. Cross-boundary key "l1:s2"         → remove (groups become one)
+        //   2. Key "l1:X" (X ≠ s2)               → update to "l2:X"
+        //      (left group was a disjoint-left endpoint; its lastOcc grew to l2)
+        //   3. Key "Y:s2" (Y ≠ l1)               → update to "Y:s1"
+        //      (right group was a disjoint-right endpoint; its startIndex shrank to s1)
+        const links = disjointLinksRef.current;
+        if (links.size > 0) {
+          let changed = false;
+          const updated = new Set<string>();
+          for (const key of links) {
+            const colonIdx = key.indexOf(":");
+            const l = parseInt(key.slice(0, colonIdx), 10);
+            const r = parseInt(key.slice(colonIdx + 1), 10);
+            if (l === leftLastOcc && r === rightFirstOcc) {
+              // Case 1: direct cross-boundary link — superseded by adjacent merge.
+              changed = true;
+            } else if (l === leftLastOcc) {
+              // Case 2: left group was a disjoint-left endpoint.
+              updated.add(`${mergedEnd}:${r}`);
+              changed = true;
+            } else if (r === rightFirstOcc) {
+              // Case 3: right group was a disjoint-right endpoint.
+              updated.add(`${l}:${mergedStart}`);
+              changed = true;
+            } else {
+              updated.add(key);
+            }
+          }
+          if (changed) {
+            setDisjointLinks(updated);
+          }
+        }
+
         setOccurrences((prev) => {
           const next = [...prev];
           next[occIndex] = { ...next[occIndex], linkedWithNext: true };
