@@ -554,3 +554,93 @@ two sections feel consistent.
   the text content (mirroring the row-order panel).
 
 **Files:** `components/interlinearizer.tsx`
+
+---
+
+## P-01 · Eliminate initial strip position flash
+
+**Type:** performance
+**Status:** open
+
+### Description
+`translateX` is initialised to `0`. The two `useEffect`s that call `recalcTranslate`
+fire after the first browser paint, so for one frame the strip renders at x=0 before
+jumping to the correct pinned position (`ACTIVE_LEFT_PX`).
+
+### Resolution
+Add an `isReady` boolean state (default `false`). Apply `opacity-0` to the strip
+container until `isReady` is `true`. Modify `recalcTranslate` to call
+`setIsReady(true)` on its first successful execution. The existing
+`transition-opacity duration-200` on the container produces a gentle fade-in once
+the position is correct; no visible jump occurs.
+
+**Files:** `components/interlinearizer.tsx`
+
+---
+
+## P-02 · Arc positions wrong for 300 ms after each navigation
+
+**Type:** performance
+**Status:** open
+
+### Description
+The arc `useEffect` lists `translateX` as a dependency. On navigation, `translateX`
+changes at the start of the 300 ms slide animation; the effect fires immediately and
+calls `getBoundingClientRect()` while the strip is mid-animation, producing arcs at
+wrong positions. The effect fires a second time via `arcTick` (bumped by `transitionend`
+300 ms later) and draws arcs correctly. The result is a visible arc jump after every
+navigation. Additionally `linkedGroups` is a dep, so the effect re-runs on every
+gloss/morpheme keystroke.
+
+### Resolution
+- Remove `translateX` and `linkedGroups` from the arc effect's dependency array.
+- Read both values via refs inside the effect (mirrors the existing `linkedGroupsRef`
+  pattern; add an `activeGroupIndexRef`).
+- Dependency list becomes `[disjointLinks, arcTick]` only — arcs are only redrawn
+  when links change or the slide animation ends.
+
+**Files:** `components/interlinearizer.tsx`
+
+---
+
+## P-03 · RAF recalc fires on every gloss/morpheme keystroke
+
+**Type:** performance
+**Status:** open
+
+### Description
+The RAF-wrapped `useEffect` that calls `recalcTranslate` depends on `linkedGroups`
+(array identity). `linkedGroups` is rebuilt whenever `occurrences` changes, which
+includes every single keystroke in a gloss or morpheme input. This triggers a
+`requestAnimationFrame` and a strip-position recalculation on every character typed.
+
+### Resolution
+- Change the RAF effect's dependency from `linkedGroups` (identity) to
+  `linkedGroups.length` (structural — only changes when groups are added or removed).
+- Collapse both recalc effects into a single RAF-wrapped one (the immediate effect
+  is redundant since the RAF fires within the same frame after a layout change).
+
+**Files:** `components/interlinearizer.tsx`
+
+---
+
+## P-04 · `renderItems` rebuilds on every gloss/morpheme keystroke
+
+**Type:** performance
+**Status:** open
+
+### Description
+`renderItems` depends on both `linkedGroups` (new identity per keystroke via
+`occurrences` churn) and `occurrences` (new identity per keystroke). The only value
+read from `occurrences` is `occurrences[lastOccIndex].linkedWithNext` to set the
+`isLinked` flag on each link button — but this value is already available inside
+`linkedGroups[gi].occurrences[last].linkedWithNext`. The `occurrences` dependency
+is redundant and forces a full rebuild of the entire strip render list on every
+character typed.
+
+### Resolution
+Replace `occurrences[lastOccIndex].linkedWithNext` with
+`group.occurrences[group.occurrences.length - 1].linkedWithNext`. Remove
+`occurrences` from `renderItems`'s dependency array.
+
+**Files:** `components/interlinearizer.tsx`

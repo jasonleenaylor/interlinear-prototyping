@@ -73,6 +73,9 @@ export function Interlinearizer() {
   // Incremented by transitionend so the arc useEffect re-fires after the strip
   // slide animation completes, ensuring arc coordinates use final DOM positions.
   const [arcTick, setArcTick] = useState(0);
+  // Starts false so the strip stays hidden until recalcTranslate has computed
+  // the correct translateX — prevents the one-frame flash at x=0 on initial paint.
+  const [isReady, setIsReady] = useState(false);
   const stripContainerRef = useRef<HTMLDivElement>(null);
 
   const sameBcv = useCallback(
@@ -91,6 +94,7 @@ export function Interlinearizer() {
 
     const targetTranslate = ACTIVE_LEFT_PX - activeEl.offsetLeft;
     setTranslateX(targetTranslate);
+    setIsReady(true);
   }, [activeGroupIndex]);
 
   /**
@@ -410,7 +414,7 @@ export function Interlinearizer() {
           ref={stripContainerRef}
           className={cn(
             "[overflow-x:clip] overflow-y-visible relative flex-1 min-w-0 transition-opacity duration-200",
-            isFading && "opacity-0",
+            (!isReady || isFading) && "opacity-0",
           )}
           role="region"
           aria-label="Scripture interlinear view"
