@@ -406,7 +406,7 @@ export function Interlinearizer() {
         <div
           ref={stripContainerRef}
           className={cn(
-            "[overflow-x:clip] overflow-y-visible relative flex-1 transition-opacity duration-200",
+            "[overflow-x:clip] overflow-y-visible relative flex-1 min-w-0 transition-opacity duration-200",
             isFading && "opacity-0",
           )}
           role="region"

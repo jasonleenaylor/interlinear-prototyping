@@ -508,3 +508,25 @@ surface row. Adding `items-center` (or consistent `py-0.5 pt-1` padding) to ever
 cell wrapper in the surface subgrid row should align them.
 
 **Likely files:** `components/occurrence-box.tsx`
+
+---
+
+## B-06 · Row-order settings panel does not open
+
+**Type:** bug  
+**Status:** done (awaiting manual verification before commit)
+
+### Description
+Clicking the `Settings2` (gear) icon button that opens the row-order settings panel
+has no visible effect. The panel does not appear.
+
+### Root cause
+The strip container uses `flex-1`, which causes it to fill 100% of the parent
+width. When `RowOrderSettings` (`w-36 shrink-0`) renders as a flex sibling, it
+is pushed outside the viewport with no visible space allocated to it.
+
+### Resolution
+Add `min-w-0` to the strip container so it can shrink below its intrinsic
+content width when the panel is open, giving the panel the space it needs.
+
+**Likely files:** `components/interlinearizer.tsx`
