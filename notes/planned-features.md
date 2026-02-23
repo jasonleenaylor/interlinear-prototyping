@@ -530,3 +530,27 @@ Add `min-w-0` to the strip container so it can shrink below its intrinsic
 content width when the panel is open, giving the panel the space it needs.
 
 **Likely files:** `components/interlinearizer.tsx`
+
+---
+
+## E-03 · Unify section config buttons and panel placement
+
+**Type:** enhancement  
+**Status:** done (awaiting manual verification before commit)
+
+### Goal
+Both the interlinear strip and the text area have a config button that opens a
+settings panel. Unify their icon, placement, and panel-open direction so the
+two sections feel consistent.
+
+### Behaviour
+- Both buttons use the `SlidersHorizontal` icon.
+- Both are right-aligned in a header row above their respective content.
+- Both panels open to the **right** of their content as a `shrink-0` flex
+  sibling, matching the existing row-order panel layout.
+- The row-order button moves from its own left-aligned row to a right-aligned
+  header above the strip.
+- The text-config panel moves from inline-below to a right-side sibling of
+  the text content (mirroring the row-order panel).
+
+**Files:** `components/interlinearizer.tsx`

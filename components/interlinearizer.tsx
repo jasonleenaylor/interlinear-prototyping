@@ -8,7 +8,7 @@ import { RowOrderSettings } from "@/components/row-order-settings";
 import { useRowOrder } from "@/hooks/use-row-order";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Settings2, SlidersHorizontal, Link2, Copy } from "lucide-react";
+import { SlidersHorizontal, Link2, Copy } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { OccurrenceType } from "@/lib/interlinear-model";
 import { type Occurrence } from "@/lib/interlinear-types";
@@ -388,16 +388,19 @@ export function Interlinearizer() {
         </span>
       </div>
 
-      {/* Settings button row */}
-      <div className="flex items-center">
+      {/* Strip header — config button right-aligned */}
+      <div className="flex items-center justify-end">
         <Button
           variant="ghost"
           size="icon-sm"
           onClick={rowOrder.open}
           aria-label="Row order settings"
-          className="text-muted-foreground hover:text-foreground"
+          className={cn(
+            "text-muted-foreground hover:text-foreground",
+            rowOrder.isOpen && "text-foreground",
+          )}
         >
-          <Settings2 className="size-4" />
+          <SlidersHorizontal className="size-4" />
         </Button>
       </div>
 
@@ -596,7 +599,7 @@ export function Interlinearizer() {
 
       {/* Text area */}
       <div className="px-3 py-2 rounded-md bg-muted/50 border border-border">
-        {/* Header: config button only, right-aligned */}
+        {/* Header: config button right-aligned */}
         <div className="flex items-center justify-end mb-1">
           <Button
             variant="ghost"
@@ -612,27 +615,9 @@ export function Interlinearizer() {
           </Button>
         </div>
 
-        {/* Inline config panel */}
-        {textConfig.isOpen && (
-          <div className="mb-2 px-2 py-1.5 rounded border border-border bg-background flex flex-col gap-1.5 text-xs">
-            <label className="flex items-center gap-2 cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={textConfig.showLiteral}
-                onChange={textConfig.toggleLiteral}
-              />
-              Literal translation
-            </label>
-            <label className="flex items-center gap-2 cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={textConfig.showFree}
-                onChange={textConfig.toggleFree}
-              />
-              Free translation
-            </label>
-          </div>
-        )}
+        {/* Text content + optional config panel side-by-side */}
+        <div className="flex items-start gap-2">
+          <div className="flex-1 min-w-0">
 
         {/* Contiguous text mode (no translation lines shown) */}
         {!textConfig.showLiteral && !textConfig.showFree && (
@@ -780,6 +765,37 @@ export function Interlinearizer() {
               </div>
             );
           })}
+          </div>{/* end flex-1 min-w-0 text content */}
+
+          {/* Text config panel — right-side sibling, mirrors row-order panel */}
+          {textConfig.isOpen && (
+            <div className="flex flex-col w-36 shrink-0 border rounded-lg bg-background shadow-md z-10 self-start">
+              <div className="px-3 py-2 border-b">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  Text display
+                </p>
+              </div>
+              <div className="px-3 py-2 flex flex-col gap-2 text-xs">
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={textConfig.showLiteral}
+                    onChange={textConfig.toggleLiteral}
+                  />
+                  Literal
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={textConfig.showFree}
+                    onChange={textConfig.toggleFree}
+                  />
+                  Free
+                </label>
+              </div>
+            </div>
+          )}
+        </div>{/* end flex items-start gap-2 */}
       </div>
     </div>
   );
