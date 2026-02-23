@@ -101,7 +101,7 @@ Only text-area clicks use the fade; ← → navigation keeps the existing slide.
 
 ## F-05 · Text-area config: literal / free translation lines
 
-**Status:** done (awaiting manual verification before commit)
+**Status:** done — committed
 
 ### Header changes
 - Removed the "Source Text" label.
@@ -277,7 +277,7 @@ as long as order remains adjacent and in sequence.
 
 ## F-10 · Render punctuation as plain text in interlinear flow
 
-**Status:** done (awaiting manual verification before commit)
+**Status:** done — committed
 
 ### Goal
 Punctuation occurrences should remain visible in the source text flow but should not
@@ -351,7 +351,7 @@ fit on screen with less scrolling while preserving readability and editability.
 
 ## F-11 · Link disjoint occurrences without auto-linking intermediates
 
-**Status:** done (awaiting manual verification before commit)
+**Status:** done — committed
 
 ### Goal
 Allow users to link two non-adjacent occurrences directly without forcing all
@@ -421,3 +421,90 @@ second overlapping disjoint link.
   if the original cross-punctuation relationship still makes sense.
 
 **Likely files:** `hooks/use-interlinear.ts`, `components/interlinearizer.tsx`
+
+---
+
+## B-02 · Gloss row splits instead of filling the full box width
+
+**Type:** bug  
+**Status:** done — committed
+
+### Description
+When disjoint groups are present the gloss row is split into two sections — one for
+the main group and one for each disjoint group — each with its own narrow `flex-1` or
+`shrink-0` cell. The result is a narrow gloss input that does not fill the box, and a
+separate muted gloss cell for the disjoint group beside it.
+
+### Expected
+The gloss is a single value for the whole linked set. The gloss input (when active)
+should span the full width of the OccurrenceBox, exactly as it did before disjoint
+groups were introduced.
+
+**Likely files:** `components/occurrence-box.tsx`
+
+---
+
+## B-03 · Disjoint morpheme boxes are read-only
+
+**Type:** bug  
+**Status:** done — committed
+
+### Description
+Morpheme boxes for disjoint (right-endpoint) groups are rendered with `isActive={false}`
+and `onChange={() => {}}`, making them read-only at all times. The user should be able
+to edit the morphemes for disjoint occurrences while the left-endpoint group is active.
+
+### Expected
+When the left-endpoint OccurrenceBox is active, the disjoint group morpheme cells
+should be fully editable (i.e. `isActive={true}` and a real `onChange` handler wired
+to `onUpdateMorphemeText`).
+
+**Likely files:** `components/occurrence-box.tsx`
+
+---
+
+## B-04 · Word chip width and morpheme cell group width do not match
+
+**Type:** bug  
+**Status:** done — committed
+
+### Description
+Each word's surface-text chip and the corresponding morpheme cell below it should be
+the same width so the columns align. Currently the word chip in the top row and the
+morpheme cell in the morpheme row size independently, causing visible misalignment
+between each word and its morphemes.
+
+### Expected
+For both the main group and each disjoint group, the surface-text chip and its
+morpheme cell should share the same width. The simplest approach is to give the word
+column a fixed min-width or to use a CSS grid that spans both rows.
+
+**Likely files:** `components/occurrence-box.tsx`
+
+---
+
+## B-05 · Disjoint group chips/morphemes do not horizontally align with main group
+
+**Type:** bug  
+**Status:** open
+
+### Description
+Introduced by the B-02/B-03/B-04 grid rewrite. The main group's occurrence chips
+(`Dios`, `los`) sit inside the active-group OccurrenceBox on the left, while the
+disjoint group's chips (`y`, `la`) appear inside the same box further right. In the
+screenshot the disjoint chips and their morpheme cells appear noticeably lower than
+the main-group chips — they do not share the same vertical baseline.
+
+### Root cause
+The surface row subgrid `div` defaults to `align-items: stretch`, but the disjoint
+separator column (`1.25rem`) and its chip wrappers have no explicit vertical alignment,
+causing the disjoint chip cells to sit at a different vertical position than the
+main-group chips. The `pt-1 pb-0.5` top-padding on the surface-row wrapper only
+applies to the wrapper itself; individual grid cells are not automatically padded.
+
+### Expected
+All chips — main and disjoint — should sit on the same horizontal baseline within the
+surface row. Adding `items-center` (or consistent `py-0.5 pt-1` padding) to every
+cell wrapper in the surface subgrid row should align them.
+
+**Likely files:** `components/occurrence-box.tsx`

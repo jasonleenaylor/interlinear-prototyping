@@ -1,22 +1,23 @@
-"use client"
+"use client";
 
-import { Button } from "@/components/ui/button"
-import { Link2, Unlink2 } from "lucide-react"
+import { Button } from "@/components/ui/button";
+import { Link2, Unlink2 } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from "@/components/ui/tooltip"
-import { cn } from "@/lib/utils"
+} from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 
 interface LinkButtonProps {
-  isLinked: boolean
-  onClick: () => void
-  ariaLabel?: string
+  isLinked: boolean;
+  onClick: () => void;
+  ariaLabel?: string;
 }
 
 export function LinkButton({ isLinked, onClick, ariaLabel }: LinkButtonProps) {
-  const label = ariaLabel ?? (isLinked ? "Unlink occurrences" : "Link occurrences")
+  const label =
+    ariaLabel ?? (isLinked ? "Unlink occurrences" : "Link occurrences");
   return (
     <Tooltip>
       <TooltipTrigger asChild>
@@ -28,7 +29,7 @@ export function LinkButton({ isLinked, onClick, ariaLabel }: LinkButtonProps) {
             "shrink-0 size-6 mx-0.5 self-start mt-2",
             isLinked
               ? "text-sky-600 hover:text-sky-700 bg-sky-50 hover:bg-sky-100"
-              : "text-muted-foreground/50 hover:text-muted-foreground hover:bg-muted"
+              : "text-muted-foreground/50 hover:text-muted-foreground hover:bg-muted",
           )}
           aria-label={label}
         >
@@ -39,9 +40,7 @@ export function LinkButton({ isLinked, onClick, ariaLabel }: LinkButtonProps) {
           )}
         </Button>
       </TooltipTrigger>
-      <TooltipContent>
-        {label}
-      </TooltipContent>
+      <TooltipContent>{label}</TooltipContent>
     </Tooltip>
-  )
+  );
 }

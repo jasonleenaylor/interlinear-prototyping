@@ -1,12 +1,12 @@
-"use client"
+"use client";
 
-import { useRef, useCallback } from "react"
-import { cn } from "@/lib/utils"
+import { useRef, useCallback } from "react";
+import { cn } from "@/lib/utils";
 
 interface MorphemeEditorProps {
-  morphemeText: string
-  isActive: boolean
-  onChange: (newText: string) => void
+  morphemeText: string;
+  isActive: boolean;
+  onChange: (newText: string) => void;
 }
 
 /**
@@ -20,90 +20,90 @@ export function MorphemeEditor({
   isActive,
   onChange,
 }: MorphemeEditorProps) {
-  const segments = morphemeText.split(/\s+/).filter(Boolean)
-  if (segments.length === 0) segments.push("")
+  const segments = morphemeText.split(/\s+/).filter(Boolean);
+  if (segments.length === 0) segments.push("");
 
-  const inputRefs = useRef<Map<number, HTMLInputElement>>(new Map())
+  const inputRefs = useRef<Map<number, HTMLInputElement>>(new Map());
 
   const setRef = useCallback(
     (index: number) => (el: HTMLInputElement | null) => {
       if (el) {
-        inputRefs.current.set(index, el)
+        inputRefs.current.set(index, el);
       } else {
-        inputRefs.current.delete(index)
+        inputRefs.current.delete(index);
       }
     },
-    []
-  )
+    [],
+  );
 
   const rebuildText = (segs: string[]) => {
-    return segs.filter(Boolean).join(" ")
-  }
+    return segs.filter(Boolean).join(" ");
+  };
 
   const handleKeyDown = (
     e: React.KeyboardEvent<HTMLInputElement>,
-    index: number
+    index: number,
   ) => {
-    const input = e.currentTarget
-    const pos = input.selectionStart ?? 0
-    const val = input.value
+    const input = e.currentTarget;
+    const pos = input.selectionStart ?? 0;
+    const val = input.value;
 
     if (e.key === " ") {
-      e.preventDefault()
+      e.preventDefault();
       // Split at cursor position
-      const left = val.slice(0, pos)
-      const right = val.slice(pos)
-      const newSegments = [...segments]
-      newSegments.splice(index, 1, left, right)
-      onChange(rebuildText(newSegments))
+      const left = val.slice(0, pos);
+      const right = val.slice(pos);
+      const newSegments = [...segments];
+      newSegments.splice(index, 1, left, right);
+      onChange(rebuildText(newSegments));
 
       // Focus the new right box at position 0
       requestAnimationFrame(() => {
-        const nextInput = inputRefs.current.get(index + 1)
+        const nextInput = inputRefs.current.get(index + 1);
         if (nextInput) {
-          nextInput.focus()
-          nextInput.setSelectionRange(0, 0)
+          nextInput.focus();
+          nextInput.setSelectionRange(0, 0);
         }
-      })
-      return
+      });
+      return;
     }
 
     if (e.key === "Backspace" && pos === 0 && index > 0) {
-      e.preventDefault()
+      e.preventDefault();
       // Join with previous box
-      const prevVal = segments[index - 1]
-      const cursorPos = prevVal.length
-      const merged = prevVal + val
-      const newSegments = [...segments]
-      newSegments.splice(index - 1, 2, merged)
-      onChange(rebuildText(newSegments))
+      const prevVal = segments[index - 1];
+      const cursorPos = prevVal.length;
+      const merged = prevVal + val;
+      const newSegments = [...segments];
+      newSegments.splice(index - 1, 2, merged);
+      onChange(rebuildText(newSegments));
 
       // Focus previous box at the join point
       requestAnimationFrame(() => {
-        const prevInput = inputRefs.current.get(index - 1)
+        const prevInput = inputRefs.current.get(index - 1);
         if (prevInput) {
-          prevInput.focus()
-          prevInput.setSelectionRange(cursorPos, cursorPos)
+          prevInput.focus();
+          prevInput.setSelectionRange(cursorPos, cursorPos);
         }
-      })
-      return
+      });
+      return;
     }
-  }
+  };
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement>,
-    index: number
+    index: number,
   ) => {
     // Remove any spaces that snuck in (shouldn't happen since we intercept space)
-    const val = e.target.value.replace(/\s/g, "")
-    const newSegments = [...segments]
-    newSegments[index] = val
+    const val = e.target.value.replace(/\s/g, "");
+    const newSegments = [...segments];
+    newSegments[index] = val;
     // If a segment becomes empty and it's not the only one, remove it
     const filtered = newSegments.filter(
-      (s, i) => s.length > 0 || (newSegments.length === 1 && i === 0)
-    )
-    onChange(rebuildText(filtered.length > 0 ? filtered : [""]))
-  }
+      (s, i) => s.length > 0 || (newSegments.length === 1 && i === 0),
+    );
+    onChange(rebuildText(filtered.length > 0 ? filtered : [""]));
+  };
 
   return (
     <div className="flex gap-0.5 min-h-[28px]">
@@ -114,7 +114,7 @@ export function MorphemeEditor({
             "flex-1 min-w-0 rounded border text-center font-mono text-xs",
             isActive
               ? "border-sky-300 bg-white"
-              : "border-muted-foreground/20 bg-muted/50"
+              : "border-muted-foreground/20 bg-muted/50",
           )}
         >
           {isActive ? (
@@ -135,5 +135,5 @@ export function MorphemeEditor({
         </div>
       ))}
     </div>
-  )
+  );
 }

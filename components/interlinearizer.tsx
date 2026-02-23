@@ -25,7 +25,7 @@ import { useTextConfig } from "@/hooks/use-text-config";
  */
 
 const ACTIVE_LEFT_PX = 340; // fixed x-position of the active group's left edge
-const ARC_PEAK_PX = 32;     // how far above the group box tops the arc peaks
+const ARC_PEAK_PX = 32; // how far above the group box tops the arc peaks
 
 export function Interlinearizer() {
   const {
@@ -67,7 +67,9 @@ export function Interlinearizer() {
   const [translateX, setTranslateX] = useState(0);
   const [isFading, setIsFading] = useState(false);
   // SVG arc paths for disjoint links
-  const [arcPaths, setArcPaths] = useState<{ key: string; d: string; isActive: boolean }[]>([]);
+  const [arcPaths, setArcPaths] = useState<
+    { key: string; d: string; isActive: boolean }[]
+  >([]);
   // Incremented by transitionend so the arc useEffect re-fires after the strip
   // slide animation completes, ensuring arc coordinates use final DOM positions.
   const [arcTick, setArcTick] = useState(0);
@@ -170,10 +172,14 @@ export function Interlinearizer() {
 
       // Find which groups these occurrences belong to
       const leftGi = linkedGroups.findIndex(
-        (g) => leftOcc >= g.startIndex && leftOcc < g.startIndex + g.occurrences.length,
+        (g) =>
+          leftOcc >= g.startIndex &&
+          leftOcc < g.startIndex + g.occurrences.length,
       );
       const rightGi = linkedGroups.findIndex(
-        (g) => rightOcc >= g.startIndex && rightOcc < g.startIndex + g.occurrences.length,
+        (g) =>
+          rightOcc >= g.startIndex &&
+          rightOcc < g.startIndex + g.occurrences.length,
       );
       if (leftGi < 0 || rightGi < 0) continue;
 
@@ -196,7 +202,8 @@ export function Interlinearizer() {
       const cpX2 = x1 + (x2 - x1) * 0.75;
 
       const d = `M ${x1} ${y1} C ${cpX1} ${midY}, ${cpX2} ${midY}, ${x2} ${y2}`;
-      const isActive = leftGi === activeGroupIndex || rightGi === activeGroupIndex;
+      const isActive =
+        leftGi === activeGroupIndex || rightGi === activeGroupIndex;
       paths.push({ key, d, isActive });
     }
 
@@ -228,7 +235,8 @@ export function Interlinearizer() {
     for (const key of disjointLinks) {
       const rOcc = parseInt(key.split(":")[1], 10);
       const rGi = linkedGroups.findIndex(
-        (g) => rOcc >= g.startIndex && rOcc < g.startIndex + g.occurrences.length,
+        (g) =>
+          rOcc >= g.startIndex && rOcc < g.startIndex + g.occurrences.length,
       );
       if (rGi !== -1) result.add(rGi);
     }
@@ -259,9 +267,12 @@ export function Interlinearizer() {
         // Emit a link button after the cluster (allows disjoint-linking to next group)
         const nextGi = clusterIndices[clusterIndices.length - 1] + 1;
         if (nextGi < linkedGroups.length && !isPunctuationGroup(nextGi)) {
-          const lastClusterGroup = linkedGroups[clusterIndices[clusterIndices.length - 1]];
+          const lastClusterGroup =
+            linkedGroups[clusterIndices[clusterIndices.length - 1]];
           const lastOccIndex =
-            lastClusterGroup.startIndex + lastClusterGroup.occurrences.length - 1;
+            lastClusterGroup.startIndex +
+            lastClusterGroup.occurrences.length -
+            1;
           items.push({
             type: "link",
             occIndex: lastOccIndex,
@@ -307,19 +318,25 @@ export function Interlinearizer() {
       while (leftGi >= 0 && isPunctuationGroup(leftGi)) leftGi--;
       // Find the nearest word group to the right
       let rightGi = gi + 1;
-      while (rightGi < linkedGroups.length && isPunctuationGroup(rightGi)) rightGi++;
+      while (rightGi < linkedGroups.length && isPunctuationGroup(rightGi))
+        rightGi++;
       if (leftGi < 0 || rightGi >= linkedGroups.length) continue;
 
       const leftGroup = linkedGroups[leftGi];
       const rightGroup = linkedGroups[rightGi];
-      const leftOccIndex = leftGroup.startIndex + leftGroup.occurrences.length - 1;
+      const leftOccIndex =
+        leftGroup.startIndex + leftGroup.occurrences.length - 1;
       const rightOccIndex = rightGroup.startIndex;
       const key = `${leftOccIndex}:${rightOccIndex}`;
 
       // Only assign to the FIRST punct group in a run (avoids duplicate buttons)
       const prevIsAlsoPunct = gi > 0 && isPunctuationGroup(gi - 1);
       if (!prevIsAlsoPunct) {
-        map.set(gi, { leftOccIndex, rightOccIndex, isLinked: disjointLinks.has(key) });
+        map.set(gi, {
+          leftOccIndex,
+          rightOccIndex,
+          isLinked: disjointLinks.has(key),
+        });
       }
     }
     return map;
@@ -488,9 +505,16 @@ export function Interlinearizer() {
                           <div data-testid="cross-punct-link-btn">
                             <LinkButton
                               isLinked={xLink.isLinked}
-                              ariaLabel={xLink.isLinked ? "Unlink across punctuation" : "Link across punctuation"}
+                              ariaLabel={
+                                xLink.isLinked
+                                  ? "Unlink across punctuation"
+                                  : "Link across punctuation"
+                              }
                               onClick={() =>
-                                toggleLink(xLink.leftOccIndex, xLink.rightOccIndex)
+                                toggleLink(
+                                  xLink.leftOccIndex,
+                                  xLink.rightOccIndex,
+                                )
                               }
                             />
                           </div>

@@ -125,7 +125,9 @@ export function useInterlinear() {
     setActiveIndex((prev) => {
       const groups = linkedGroupsRef.current;
       const links = disjointLinksRef.current;
-      const rightStarts = new Set([...links].map((k) => parseInt(k.split(":")[1], 10)));
+      const rightStarts = new Set(
+        [...links].map((k) => parseInt(k.split(":")[1], 10)),
+      );
       const currentGroupIdx = groups.findIndex(
         (g) =>
           prev >= g.startIndex && prev < g.startIndex + g.occurrences.length,
@@ -147,7 +149,9 @@ export function useInterlinear() {
     setActiveIndex((prev) => {
       const groups = linkedGroupsRef.current;
       const links = disjointLinksRef.current;
-      const rightStarts = new Set([...links].map((k) => parseInt(k.split(":")[1], 10)));
+      const rightStarts = new Set(
+        [...links].map((k) => parseInt(k.split(":")[1], 10)),
+      );
       const currentGroupIdx = groups.findIndex(
         (g) =>
           prev >= g.startIndex && prev < g.startIndex + g.occurrences.length,
@@ -265,7 +269,7 @@ export function useInterlinear() {
       if (occIndex === activeEnd || occIndex + 1 === activeGroup.startIndex) {
         // Determine the boundary indices of the two groups being merged.
         // Key format: "leftGroupLastOcc:rightGroupFirstOcc".
-        const leftLastOcc = occIndex;       // last occ of the left group (l1)
+        const leftLastOcc = occIndex; // last occ of the left group (l1)
         const rightFirstOcc = occIndex + 1; // first occ of the right group (s2)
 
         // Find the left and right group objects to know the full new extent.
@@ -329,7 +333,9 @@ export function useInterlinear() {
       const leftLastOcc =
         occIndex < activeGroup.startIndex ? occIndex : activeEnd;
       const rightFirstOcc =
-        occIndex < activeGroup.startIndex ? activeGroup.startIndex : occIndex + 1;
+        occIndex < activeGroup.startIndex
+          ? activeGroup.startIndex
+          : occIndex + 1;
       const key = `${leftLastOcc}:${rightFirstOcc}`;
 
       setDisjointLinks((prev) => {
