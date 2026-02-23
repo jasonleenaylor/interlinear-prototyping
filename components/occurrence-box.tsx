@@ -17,11 +17,11 @@ interface OccurrenceBoxProps {
   onBackward: () => void;
   onUpdateGloss: (groupStartIndex: number, gloss: string) => void;
   onUpdateMorphemeText: (occIndex: number, text: string) => void;
-  onUnlink: (occIndex: number) => void;
+  onUnlink: (occIndex: number, rightOccIndex?: number) => void;
   canGoBack: boolean;
   canGoForward: boolean;
-  /** Non-adjacent occurrences linked to this group — shown grayed out, not analyzable. */
-  disjointOccurrences?: Occurrence[];
+  /** Non-adjacent groups linked to this group — shown muted with full analysis. */
+  disjointGroups?: { startIndex: number; occurrences: Occurrence[] }[];
 }
 
 export function OccurrenceBox({
@@ -36,7 +36,7 @@ export function OccurrenceBox({
   onUnlink,
   canGoBack,
   canGoForward,
-  disjointOccurrences,
+  disjointGroups,
 }: OccurrenceBoxProps) {
   const allApproved = group.occurrences.every((o) => o.approved);
   // Gloss is stored on the first occurrence of the group
@@ -83,15 +83,37 @@ export function OccurrenceBox({
             )}
           </div>
         ))}
-        {/* Non-adjacent linked occurrences — surface text only, grayed out like punctuation */}
-        {disjointOccurrences?.map((occ) => (
-          <div key={`disjoint-${occ.id}`} className="relative shrink-0">
-            <div
-              data-testid="disjoint-occ-token"
-              className="mx-0.5 px-1.5 py-0.5 text-center font-mono text-base font-semibold text-muted-foreground/60 rounded border border-dashed border-muted-foreground/25 bg-muted/20 select-none"
+        {/* Non-adjacent (disjoint) linked groups — muted with unlink button */}
+        {disjointGroups?.map((dg) => (
+          <div key={`dg-${dg.startIndex}`} className="flex items-stretch">
+            {/* Unlink button between main group and this disjoint group */}
+            <button
+              onClick={() =>
+                onUnlink(
+                  group.startIndex + group.occurrences.length - 1,
+                  dg.startIndex,
+                )
+              }
+              className="relative flex h-full w-4 items-center justify-center group/unlink shrink-0"
+              aria-label="Unlink disjoint group"
+              type="button"
             >
-              {occ.text}
-            </div>
+              <div className="flex flex-col items-center gap-0.5">
+                <span className="block w-px h-2 bg-muted-foreground/30" />
+                <Unlink2 className="size-3 text-muted-foreground/40 group-hover/unlink:text-red-500 transition-colors" />
+                <span className="block w-px h-2 bg-muted-foreground/30" />
+              </div>
+            </button>
+            {dg.occurrences.map((occ) => (
+              <div key={`dg-occ-${occ.id}`} className="relative shrink-0">
+                <div
+                  data-testid="disjoint-occ-token"
+                  className="mx-0.5 px-1.5 py-0.5 text-center font-mono text-base font-semibold text-muted-foreground/60 rounded border border-dashed border-muted-foreground/25 bg-muted/20 select-none"
+                >
+                  {occ.text}
+                </div>
+              </div>
+            ))}
           </div>
         ))}
       </div>
@@ -102,29 +124,43 @@ export function OccurrenceBox({
           return (
             <div
               key="gloss"
-              className="flex items-center px-1 py-0.5 border-t border-muted-foreground/15"
+              className="flex items-center border-t border-muted-foreground/15"
             >
-              {isActive ? (
-                <Input
-                  value={gloss}
-                  onChange={(e) =>
-                    onUpdateGloss(group.startIndex, e.target.value)
-                  }
-                  placeholder="gloss"
-                  size={1}
-                  className="flex-1 min-w-0 w-auto h-6 text-sm font-mono bg-white border-muted-foreground/20 text-center"
-                  autoFocus
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      onApprove();
+              {/* Main group gloss */}
+              <div className="flex-1 min-w-0 px-1 py-0.5">
+                {isActive ? (
+                  <Input
+                    value={gloss}
+                    onChange={(e) =>
+                      onUpdateGloss(group.startIndex, e.target.value)
                     }
-                  }}
-                />
-              ) : (
-                <div className="h-6 w-full flex items-center justify-center text-sm font-mono text-muted-foreground">
-                  {gloss || "\u00A0"}
+                    placeholder="gloss"
+                    size={1}
+                    className="w-full h-6 text-sm font-mono bg-white border-muted-foreground/20 text-center"
+                    autoFocus
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        onApprove();
+                      }
+                    }}
+                  />
+                ) : (
+                  <div className="h-6 flex items-center justify-center text-sm font-mono text-muted-foreground">
+                    {gloss || "\u00A0"}
+                  </div>
+                )}
+              </div>
+              {/* Disjoint group glosses — read-only, muted */}
+              {disjointGroups?.map((dg) => (
+                <div
+                  key={`dg-gloss-${dg.startIndex}`}
+                  className="shrink-0 px-1 py-0.5 border-l border-dashed border-muted-foreground/25"
+                >
+                  <div className="h-6 flex items-center justify-center text-sm font-mono text-muted-foreground/50 select-none">
+                    {dg.occurrences[0]?.gloss || "\u00A0"}
+                  </div>
                 </div>
-              )}
+              ))}
             </div>
           );
         }
@@ -152,6 +188,25 @@ export function OccurrenceBox({
                   />
                 </div>
               ))}
+              {/* Disjoint group morphemes — read-only, muted */}
+              {disjointGroups?.flatMap((dg) =>
+                dg.occurrences.map((occ, i) => (
+                  <div
+                    key={`dg-morph-${occ.id}`}
+                    className={cn(
+                      "px-0.5 py-0.5 shrink-0 border-l border-dashed border-muted-foreground/25",
+                      i < dg.occurrences.length - 1 &&
+                        "border-r border-dashed border-muted-foreground/30",
+                    )}
+                  >
+                    <MorphemeEditor
+                      morphemeText={occ.morphemeText}
+                      isActive={false}
+                      onChange={() => {}}
+                    />
+                  </div>
+                )),
+              )}
             </div>
           );
         }

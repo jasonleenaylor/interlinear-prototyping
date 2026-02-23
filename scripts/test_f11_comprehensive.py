@@ -4,7 +4,7 @@ F-11 comprehensive tests — disjoint occurrence linking.
 Four test groups:
 
 A. Ghost skip: navigating forward/backward never makes the ghost (right endpoint)
-   group active.
+   group active. Right endpoint is NEVER navigable.
 
 B. Arc style across 4 nav positions:
    B1. BEFORE left endpoint  -> arc dashed,  1 ghost chip (right only), 1 disjoint token (left box always shows it)
@@ -181,10 +181,10 @@ with sync_playwright() as p:
     time.sleep(0.5)
 
     # =========================================================================
-    # TEST GROUP A - Ghost group is never navigated to
+    # TEST GROUP A - Ghost skip: right endpoint NEVER becomes active
     # =========================================================================
     print("\n" + "=" * 70)
-    print("TEST GROUP A: Ghost (right endpoint) is never the active group")
+    print("TEST GROUP A: Ghost skip — right endpoint is NEVER navigable")
     print("=" * 70)
 
     leftA, rightA = setup(page, link_btn_index=25, nav_before=2)
@@ -208,7 +208,7 @@ with sync_playwright() as p:
             time.sleep(0.15)
 
         distinct = set(s for s in active_history if s is not None)
-        check("A1: Ghost group NEVER becomes active",
+        check("A1: Right endpoint NEVER becomes active (always skipped)",
               rightA in active_history, "==", False)
         check("A2: Left endpoint WAS active at some point",
               leftA in active_history, "==", True)
@@ -241,7 +241,7 @@ with sync_playwright() as p:
         page.screenshot(path="scripts/f11_comp_B2_at_left.png")
 
         # B1: BEFORE left endpoint - navigate backward
-        print("\n  B1: BEFORE left endpoint -> arc DASHED, 2 ghosts, 0 tokens")
+        print("\n  B1: BEFORE left endpoint -> arc DASHED, 1 ghost, 1 token")
         for _ in range(20):
             cur = active_start(page)
             if cur is not None and cur < leftB:
@@ -269,7 +269,7 @@ with sync_playwright() as p:
             nav(page, NAV_NEXT_SEL)
 
         # B3: BETWEEN endpoints - 2 steps forward from left endpoint
-        print("\n  B3: BETWEEN endpoints -> arc DASHED, 2 ghosts, 0 tokens")
+        print("\n  B3: BETWEEN endpoints -> arc DASHED, 1 ghost, 1 token")
         nav(page, NAV_NEXT_SEL, 2)
         cur = active_start(page)
         print("    active={}  leftStart={}  rightStart={}".format(cur, leftB, rightB))
@@ -283,7 +283,7 @@ with sync_playwright() as p:
         page.screenshot(path="scripts/f11_comp_B3_between.png")
 
         # B4: AFTER right endpoint
-        print("\n  B4: AFTER right endpoint -> arc DASHED, 2 ghosts, 0 tokens")
+        print("\n  B4: AFTER right endpoint -> arc DASHED, 1 ghost, 1 token")
         for _ in range(35):
             cur = active_start(page)
             if cur is not None and rightB is not None and cur > rightB:

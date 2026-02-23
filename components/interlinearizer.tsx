@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Settings2, SlidersHorizontal, Link2, Copy } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { OccurrenceType } from "@/lib/interlinear-model";
+import { type Occurrence } from "@/lib/interlinear-types";
 import { useTextConfig } from "@/hooks/use-text-config";
 
 /**
@@ -218,36 +219,74 @@ export function Interlinearizer() {
     return () => cancelAnimationFrame(id);
   }, [recalcTranslate, linkedGroups]);
 
+  /**
+   * Every group index that is a RIGHT-endpoint of any disjoint link.
+   * These render as ghost chips (non-navigable muted text) in the strip.
+   */
+  const ghostGroupIndices = useMemo(() => {
+    const result = new Set<number>();
+    for (const key of disjointLinks) {
+      const rOcc = parseInt(key.split(":")[1], 10);
+      const rGi = linkedGroups.findIndex(
+        (g) => rOcc >= g.startIndex && rOcc < g.startIndex + g.occurrences.length,
+      );
+      if (rGi !== -1) result.add(rGi);
+    }
+    return result;
+  }, [disjointLinks, linkedGroups]);
+
   // Build render list: groups with link buttons between them
   const renderItems = useMemo(() => {
-    const items: Array<
+    type RenderItem =
       | { type: "group"; groupIndex: number }
       | { type: "link"; occIndex: number; isLinked: boolean }
-    > = [];
+      | { type: "ghost-cluster"; groupIndices: number[] };
+    const items: RenderItem[] = [];
 
     const isPunctuationGroup = (gi: number) =>
       linkedGroups[gi].occurrences.every((o) => o.isPunctuation);
 
-    for (let gi = 0; gi < linkedGroups.length; gi++) {
-      items.push({ type: "group", groupIndex: gi });
-
-      if (gi < linkedGroups.length - 1) {
-        const group = linkedGroups[gi];
-        const lastOccIndex = group.startIndex + group.occurrences.length - 1;
-
-        if (!isPunctuationGroup(gi) && !isPunctuationGroup(gi + 1)) {
-          // Normal word-to-word boundary: standard link button
+    let gi = 0;
+    while (gi < linkedGroups.length) {
+      if (ghostGroupIndices.has(gi)) {
+        // Collect consecutive ghost groups into one combined chip
+        const clusterIndices: number[] = [gi];
+        while (gi + 1 < linkedGroups.length && ghostGroupIndices.has(gi + 1)) {
+          gi++;
+          clusterIndices.push(gi);
+        }
+        items.push({ type: "ghost-cluster", groupIndices: clusterIndices });
+        // Emit a link button after the cluster (allows disjoint-linking to next group)
+        const nextGi = clusterIndices[clusterIndices.length - 1] + 1;
+        if (nextGi < linkedGroups.length && !isPunctuationGroup(nextGi)) {
+          const lastClusterGroup = linkedGroups[clusterIndices[clusterIndices.length - 1]];
+          const lastOccIndex =
+            lastClusterGroup.startIndex + lastClusterGroup.occurrences.length - 1;
           items.push({
             type: "link",
             occIndex: lastOccIndex,
             isLinked: occurrences[lastOccIndex].linkedWithNext,
           });
         }
+      } else {
+        items.push({ type: "group", groupIndex: gi });
+        if (gi < linkedGroups.length - 1) {
+          const group = linkedGroups[gi];
+          const lastOccIndex = group.startIndex + group.occurrences.length - 1;
+          if (!isPunctuationGroup(gi) && !isPunctuationGroup(gi + 1)) {
+            items.push({
+              type: "link",
+              occIndex: lastOccIndex,
+              isLinked: occurrences[lastOccIndex].linkedWithNext,
+            });
+          }
+        }
       }
+      gi++;
     }
 
     return items;
-  }, [linkedGroups, occurrences]);
+  }, [linkedGroups, occurrences, ghostGroupIndices]);
 
   /**
    * For each punctuation group index, the cross-punctuation link info (if it sits
@@ -287,31 +326,15 @@ export function Interlinearizer() {
   }, [linkedGroups, disjointLinks]);
 
   /**
-   * Every group index that is an endpoint of any disjoint link.
-   * Stable across navigation — depends only on the links themselves, not activeGroupIndex.
-   */
-  const ghostGroupIndices = useMemo(() => {
-    // Only RIGHT-endpoint groups are ghost chips — always, regardless of which
-    // group is active.  Left-endpoint groups render as normal (faded) inactive
-    // groups so the user can see and click on the analysis they belong to.
-    const result = new Set<number>();
-    for (const key of disjointLinks) {
-      const rOcc = parseInt(key.split(":")[1], 10);
-      const rGi = linkedGroups.findIndex(
-        (g) => rOcc >= g.startIndex && rOcc < g.startIndex + g.occurrences.length,
-      );
-      if (rGi !== -1) result.add(rGi);
-    }
-    return result;
-  }, [disjointLinks, linkedGroups]);
-
-  /**
    * Map from group index → partner occurrences for every LEFT-endpoint group.
    * These are shown grayed-out inside the analysis box whether or not the
    * group is currently active, so the linked word is always visible.
    */
   const disjointOccsPerGroup = useMemo(() => {
-    const map = new Map<number, Occurrence[]>();
+    const map = new Map<
+      number,
+      { startIndex: number; occurrences: Occurrence[] }[]
+    >();
     if (disjointLinks.size === 0) return map;
     for (const key of disjointLinks) {
       const [lStr, rStr] = key.split(":");
@@ -325,7 +348,10 @@ export function Interlinearizer() {
       const rGi = linkedGroups.findIndex((g) => g.startIndex === r);
       if (lGi !== -1 && rGi !== -1) {
         const existing = map.get(lGi) ?? [];
-        map.set(lGi, [...existing, ...linkedGroups[rGi].occurrences]);
+        map.set(lGi, [
+          ...existing,
+          { startIndex: r, occurrences: [...linkedGroups[rGi].occurrences] },
+        ]);
       }
     }
     return map;
@@ -400,6 +426,37 @@ export function Interlinearizer() {
             style={{ transform: `translateX(${translateX}px)` }}
           >
             {renderItems.map((item) => {
+              // Ghost cluster: consecutive disjoint right-endpoint groups as one
+              // combined punctuation-styled muted chip. Not navigable.
+              if (item.type === "ghost-cluster") {
+                const firstGi = item.groupIndices[0];
+                const firstGroup = linkedGroups[firstGi];
+                const dist = Math.abs(firstGi - activeGroupIndex);
+                const clusterOpacity = Math.max(0.15, 1 - dist * 0.05);
+                const allText = item.groupIndices
+                  .flatMap((cgi) =>
+                    linkedGroups[cgi].occurrences.map((o) => o.text),
+                  )
+                  .join(" ");
+                return (
+                  <div
+                    key={`ghost-cluster-${firstGroup.startIndex}`}
+                    data-group-start={firstGroup.startIndex}
+                    data-testid="disjoint-ghost-chip"
+                    ref={(el) => {
+                      item.groupIndices.forEach((cgi) => {
+                        if (el) groupRefs.current.set(cgi, el);
+                        else groupRefs.current.delete(cgi);
+                      });
+                    }}
+                    className="shrink-0 px-2 py-2 text-sm font-mono text-muted-foreground select-none"
+                    style={{ opacity: clusterOpacity }}
+                  >
+                    {allText}
+                  </div>
+                );
+              }
+
               if (item.type === "group") {
                 const gi = item.groupIndex;
                 const group = linkedGroups[gi];
@@ -452,28 +509,6 @@ export function Interlinearizer() {
                   );
                 }
 
-                // Ghost: part of a disjoint link but not the active group — non-interactive gray chip
-                if (ghostGroupIndices.has(gi)) {
-                  return (
-                    <div
-                      key={`group-${group.startIndex}`}
-                      data-group-start={group.startIndex}
-                      data-testid="disjoint-ghost-chip"
-                      ref={(el) => {
-                        if (el) {
-                          groupRefs.current.set(gi, el);
-                        } else {
-                          groupRefs.current.delete(gi);
-                        }
-                      }}
-                      className="shrink-0 px-2 py-2 text-sm font-mono text-muted-foreground/50 select-none border border-dashed border-muted-foreground/25 rounded"
-                      style={{ opacity }}
-                    >
-                      {group.occurrences.map((o) => o.text).join(" ")}
-                    </div>
-                  );
-                }
-
                 return (
                   <div
                     key={`group-${group.startIndex}`}
@@ -502,7 +537,7 @@ export function Interlinearizer() {
                       onUnlink={toggleLink}
                       canGoBack={canGoBack}
                       canGoForward={canGoForward}
-                      disjointOccurrences={disjointOccsPerGroup.get(gi)}
+                      disjointGroups={disjointOccsPerGroup.get(gi)}
                     />
                   </div>
                 );
