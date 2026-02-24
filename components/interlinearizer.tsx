@@ -26,6 +26,7 @@ import { useTextConfig } from "@/hooks/use-text-config";
 
 const ACTIVE_LEFT_PX = 340; // fixed x-position of the active group's left edge
 const ARC_PEAK_PX = 32; // how far above the group box tops the arc peaks
+const WINDOW_HALF = 10; // groups rendered on each side of the active group (21 total)
 
 export function Interlinearizer() {
   const {
@@ -77,6 +78,9 @@ export function Interlinearizer() {
   // the correct translateX — prevents the one-frame flash at x=0 on initial paint.
   const [isReady, setIsReady] = useState(false);
   const stripContainerRef = useRef<HTMLDivElement>(null);
+  // Stores the last-measured offsetWidth of every renderItem by its key string.
+  // Used to synthesise left/right spacer widths when items leave the window.
+  const itemWidthsRef = useRef<Map<string, number>>(new Map());
 
   const sameBcv = useCallback(
     (
@@ -382,6 +386,31 @@ export function Interlinearizer() {
     return map;
   }, [disjointLinks, linkedGroups]);
 
+  // ── Windowed rendering setup ────────────────────────────────────────────────
+  // Compute the slice of renderItems to actually mount. Items outside the slice
+  // are replaced by two spacer divs whose widths are the sum of stored item widths,
+  // preserving offsetLeft for the active group so recalcTranslate stays correct.
+  const getItemKey = (item: (typeof renderItems)[number]): string => {
+    if (item.type === "link") return `link-${item.occIndex}`;
+    if (item.type === "ghost-cluster")
+      return `ghost-cluster-${linkedGroups[item.groupIndices[0]].startIndex}`;
+    return `group-${linkedGroups[item.groupIndex].startIndex}`;
+  };
+  const activeItemIdx = renderItems.findIndex(
+    (item) => item.type === "group" && item.groupIndex === activeGroupIndex,
+  );
+  let windowStart = activeItemIdx < 0 ? 0 : activeItemIdx;
+  { let n = 0; while (windowStart > 0 && n < WINDOW_HALF) { windowStart--; const t = renderItems[windowStart].type; if (t === "group" || t === "ghost-cluster") n++; } }
+  let windowEnd = activeItemIdx < 0 ? renderItems.length - 1 : activeItemIdx;
+  { let n = 0; while (windowEnd < renderItems.length - 1 && n < WINDOW_HALF) { windowEnd++; const t = renderItems[windowEnd].type; if (t === "group" || t === "ghost-cluster") n++; } }
+  windowEnd++; // exclusive
+  let leftSpacerW = 0;
+  for (let i = 0; i < windowStart; i++)
+    leftSpacerW += itemWidthsRef.current.get(getItemKey(renderItems[i])) ?? 0;
+  let rightSpacerW = 0;
+  for (let i = windowEnd; i < renderItems.length; i++)
+    rightSpacerW += itemWidthsRef.current.get(getItemKey(renderItems[i])) ?? 0;
+
   return (
     <div className="flex flex-col gap-4 w-full">
       {/* Legend */}
@@ -453,7 +482,10 @@ export function Interlinearizer() {
             )}
             style={{ transform: `translateX(${translateX}px)` }}
           >
-            {renderItems.map((item) => {
+            {windowStart > 0 && (
+              <div key="spacer-left" className="shrink-0" style={{ width: leftSpacerW }} />
+            )}
+            {renderItems.slice(windowStart, windowEnd).map((item) => {
               // Ghost cluster: consecutive disjoint right-endpoint groups as one
               // combined punctuation-styled muted chip. Not navigable.
               if (item.type === "ghost-cluster") {
@@ -474,6 +506,11 @@ export function Interlinearizer() {
                         if (el) groupRefs.current.set(cgi, el);
                         else groupRefs.current.delete(cgi);
                       });
+                      if (el)
+                        itemWidthsRef.current.set(
+                          `ghost-cluster-${firstGroup.startIndex}`,
+                          el.offsetWidth,
+                        );
                     }}
                     className="shrink-0 px-2 py-2 text-sm font-mono text-muted-foreground select-none opacity-40"
                   >
@@ -499,6 +536,10 @@ export function Interlinearizer() {
                       ref={(el) => {
                         if (el) {
                           groupRefs.current.set(gi, el);
+                          itemWidthsRef.current.set(
+                            `group-${group.startIndex}`,
+                            el.offsetWidth,
+                          );
                         } else {
                           groupRefs.current.delete(gi);
                         }
@@ -546,6 +587,10 @@ export function Interlinearizer() {
                     ref={(el) => {
                       if (el) {
                         groupRefs.current.set(gi, el);
+                        itemWidthsRef.current.set(
+                          `group-${group.startIndex}`,
+                          el.offsetWidth,
+                        );
                       } else {
                         groupRefs.current.delete(gi);
                       }
@@ -578,6 +623,13 @@ export function Interlinearizer() {
               return (
                 <div
                   key={`link-${item.occIndex}`}
+                  ref={(el) => {
+                    if (el)
+                      itemWidthsRef.current.set(
+                        `link-${item.occIndex}`,
+                        el.offsetWidth,
+                      );
+                  }}
                   className="flex items-start shrink-0"
                 >
                   <LinkButton
@@ -587,6 +639,9 @@ export function Interlinearizer() {
                 </div>
               );
             })}
+            {windowEnd < renderItems.length && (
+              <div key="spacer-right" className="shrink-0" style={{ width: rightSpacerW }} />
+            )}
           </div>
         </div>
 
