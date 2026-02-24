@@ -280,7 +280,10 @@ export function Interlinearizer() {
           items.push({
             type: "link",
             occIndex: lastOccIndex,
-            isLinked: occurrences[lastOccIndex].linkedWithNext,
+            isLinked:
+              lastClusterGroup.occurrences[
+                lastClusterGroup.occurrences.length - 1
+              ].linkedWithNext,
           });
         }
       } else {
@@ -292,7 +295,8 @@ export function Interlinearizer() {
             items.push({
               type: "link",
               occIndex: lastOccIndex,
-              isLinked: occurrences[lastOccIndex].linkedWithNext,
+              isLinked:
+                group.occurrences[group.occurrences.length - 1].linkedWithNext,
             });
           }
         }
@@ -301,7 +305,7 @@ export function Interlinearizer() {
     }
 
     return items;
-  }, [linkedGroups, occurrences, ghostGroupIndices]);
+  }, [linkedGroups, ghostGroupIndices]);
 
   /**
    * For each punctuation group index, the cross-punctuation link info (if it sits
@@ -566,8 +570,8 @@ export function Interlinearizer() {
                       onUpdateGloss={updateGloss}
                       onUpdateMorphemeText={updateMorphemeText}
                       onUnlink={toggleLink}
-                      canGoBack={canGoBack}
-                      canGoForward={canGoForward}
+                      canGoBack={isActive && canGoBack}
+                      canGoForward={isActive && canGoForward}
                       disjointGroups={disjointOccsPerGroup.get(gi)}
                     />
                   </div>

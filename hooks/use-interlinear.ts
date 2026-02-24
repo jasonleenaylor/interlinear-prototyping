@@ -89,6 +89,13 @@ export function useInterlinear() {
     disjointLinksRef.current = disjointLinks;
   }, [disjointLinks]);
 
+  // Stable ref to occurrences — allows toggleLink to read current occurrence
+  // data without closing over the occurrences array.
+  const occurrencesRef = useRef(occurrences);
+  useEffect(() => {
+    occurrencesRef.current = occurrences;
+  }, [occurrences]);
+
   // The set of startIndex values that are disjoint RIGHT-endpoint groups.
   // These groups are treated like punctuation: visible but not navigable.
   const disjointRightStarts = useMemo(
@@ -102,6 +109,13 @@ export function useInterlinear() {
       activeIndex >= g.startIndex &&
       activeIndex < g.startIndex + g.occurrences.length,
   );
+
+  // Stable ref to activeGroupIndex — allows toggleApprove and toggleLink to be
+  // fully stable useCallback references (no activeGroupIndex in their dep arrays).
+  const activeGroupIndexRef = useRef(activeGroupIndex);
+  useEffect(() => {
+    activeGroupIndexRef.current = activeGroupIndex;
+  }, [activeGroupIndex]);
 
   // Segments as mutable state — can be merged/split at runtime
   const [segments, setSegments] = useState<CanonicalSegment[]>(
@@ -170,7 +184,7 @@ export function useInterlinear() {
   }, []);
 
   const toggleApprove = useCallback(() => {
-    const group = linkedGroupsRef.current[activeGroupIndex];
+    const group = linkedGroupsRef.current[activeGroupIndexRef.current];
     if (!group) return;
 
     const allApproved = group.occurrences.every((o) => o.approved);
@@ -192,7 +206,7 @@ export function useInterlinear() {
     if (newStatus) {
       moveForward();
     }
-  }, [activeGroupIndex, moveForward]);
+  }, [moveForward]);
 
   const updateGloss = useCallback((groupStartIndex: number, gloss: string) => {
     // For a linked group, we store the gloss on the first occurrence
@@ -216,7 +230,7 @@ export function useInterlinear() {
 
   const toggleLink = useCallback(
     (occIndex: number, rightOccIndex?: number) => {
-      const occs = occurrences;
+      const occs = occurrencesRef.current;
 
       // Cross-punctuation disjoint link: caller supplies explicit right occ index.
       // Bypass the punctuation guard and directly toggle the disjoint link.
@@ -250,7 +264,7 @@ export function useInterlinear() {
       }
 
       const groups = linkedGroupsRef.current;
-      const activeGroup = groups[activeGroupIndex];
+      const activeGroup = groups[activeGroupIndexRef.current];
       if (!activeGroup) {
         // Fallback: simple adjacent link
         setOccurrences((prev) => {
@@ -348,7 +362,7 @@ export function useInterlinear() {
         return next;
       });
     },
-    [occurrences, activeGroupIndex],
+    [],
   );
 
   const updateLiteralTranslation = useCallback(

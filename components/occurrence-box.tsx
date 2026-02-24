@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { type LinkedGroup, type Occurrence } from "@/lib/interlinear-types";
 import { MorphemeEditor } from "@/components/morpheme-editor";
 import { Button } from "@/components/ui/button";
@@ -24,7 +25,7 @@ interface OccurrenceBoxProps {
   disjointGroups?: { startIndex: number; occurrences: Occurrence[] }[];
 }
 
-export function OccurrenceBox({
+export const OccurrenceBox = memo(function OccurrenceBox({
   group,
   isActive,
   rowOrder,
@@ -336,4 +337,4 @@ export function OccurrenceBox({
       )}
     </div>
   );
-}
+});
