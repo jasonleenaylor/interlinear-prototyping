@@ -459,8 +459,6 @@ export function Interlinearizer() {
               if (item.type === "ghost-cluster") {
                 const firstGi = item.groupIndices[0];
                 const firstGroup = linkedGroups[firstGi];
-                const dist = Math.abs(firstGi - activeGroupIndex);
-                const clusterOpacity = Math.max(0.15, 1 - dist * 0.05);
                 const allText = item.groupIndices
                   .flatMap((cgi) =>
                     linkedGroups[cgi].occurrences.map((o) => o.text),
@@ -477,8 +475,7 @@ export function Interlinearizer() {
                         else groupRefs.current.delete(cgi);
                       });
                     }}
-                    className="shrink-0 px-2 py-2 text-sm font-mono text-muted-foreground select-none"
-                    style={{ opacity: clusterOpacity }}
+                    className="shrink-0 px-2 py-2 text-sm font-mono text-muted-foreground select-none opacity-40"
                   >
                     {allText}
                   </div>
@@ -492,9 +489,6 @@ export function Interlinearizer() {
                 const isPunctuationGroup = group.occurrences.every(
                   (o) => o.isPunctuation,
                 );
-                const distance = Math.abs(gi - activeGroupIndex);
-                // 5% opacity reduction per occurrence distance, minimum 15%
-                const opacity = Math.max(0.15, 1 - distance * 0.05);
 
                 if (isPunctuationGroup) {
                   const xLink = crossPunctLinks.get(gi);
@@ -535,8 +529,8 @@ export function Interlinearizer() {
                         className={cn(
                           "px-2 py-2 text-sm font-mono text-muted-foreground select-none",
                           xLink && "pt-6",
+                          !isActive && "opacity-40",
                         )}
-                        style={{ opacity: isActive ? 1 : opacity }}
                       >
                         {group.occurrences.map((o) => o.text).join("")}
                       </div>
@@ -556,8 +550,10 @@ export function Interlinearizer() {
                         groupRefs.current.delete(gi);
                       }
                     }}
-                    className={cn("shrink-0", !isActive && "cursor-pointer")}
-                    style={{ opacity: isActive ? 1 : opacity }}
+                    className={cn(
+                      "shrink-0",
+                      !isActive && "cursor-pointer opacity-40",
+                    )}
                     onClick={!isActive ? () => clickGroup(gi) : undefined}
                   >
                     <OccurrenceBox
@@ -626,154 +622,169 @@ export function Interlinearizer() {
         {/* Text content + optional config panel side-by-side */}
         <div className="flex items-start gap-2">
           <div className="flex-1 min-w-0">
+            {/* Contiguous text mode (no translation lines shown) */}
+            {!textConfig.showLiteral && !textConfig.showFree && (
+              <p className="text-sm font-mono leading-relaxed text-foreground">
+                {segments.flatMap((seg, si) =>
+                  seg.occurrences.map((occ, oi) => {
+                    const groupIndex = occurrenceGroupMap.get(occ.id) ?? -1;
+                    const isInActiveGroup = groupIndex === activeGroupIndex;
+                    const approved = occApprovedById.get(occ.id) ?? false;
+                    const isPunct = occ.type === OccurrenceType.Punctuation;
+                    const nextOcc =
+                      seg.occurrences[oi + 1] ??
+                      segments[si + 1]?.occurrences[0];
+                    const isLastToken =
+                      si === segments.length - 1 &&
+                      oi === seg.occurrences.length - 1;
+                    const nextIsPunct =
+                      nextOcc?.type === OccurrenceType.Punctuation;
 
-        {/* Contiguous text mode (no translation lines shown) */}
-        {!textConfig.showLiteral && !textConfig.showFree && (
-          <p className="text-sm font-mono leading-relaxed text-foreground">
-            {segments.flatMap((seg, si) =>
-              seg.occurrences.map((occ, oi) => {
-                const groupIndex = occurrenceGroupMap.get(occ.id) ?? -1;
-                const isInActiveGroup = groupIndex === activeGroupIndex;
-                const approved = occApprovedById.get(occ.id) ?? false;
-                const isPunct = occ.type === OccurrenceType.Punctuation;
-                const nextOcc =
-                  seg.occurrences[oi + 1] ?? segments[si + 1]?.occurrences[0];
-                const isLastToken =
-                  si === segments.length - 1 &&
-                  oi === seg.occurrences.length - 1;
-                const nextIsPunct =
-                  nextOcc?.type === OccurrenceType.Punctuation;
+                    return (
+                      <span
+                        key={occ.id}
+                        className={cn(
+                          "transition-colors",
+                          !isInActiveGroup && "cursor-pointer",
+                          isInActiveGroup && "bg-sky-200 rounded px-0.5",
+                          approved && !isInActiveGroup && "text-emerald-700",
+                          !approved &&
+                            !isInActiveGroup &&
+                            "text-muted-foreground",
+                        )}
+                        onClick={() =>
+                          groupIndex !== -1 && fadeToGroup(groupIndex)
+                        }
+                        onDoubleClick={() =>
+                          splitSegmentAtOccurrence(seg.id, occ.id)
+                        }
+                      >
+                        {occ.surfaceText}
+                        {!isLastToken && !isPunct && !nextIsPunct && " "}
+                        {!isLastToken && isPunct && " "}
+                      </span>
+                    );
+                  }),
+                )}
+              </p>
+            )}
+
+            {/* Segment layout mode (translation lines visible) */}
+            {(textConfig.showLiteral || textConfig.showFree) &&
+              segments.map((seg, si) => {
+                const segIsMerged = !sameBcv(seg.startRef, seg.endRef);
+                const nextSegIsMerged =
+                  si < segments.length - 1
+                    ? !sameBcv(
+                        segments[si + 1].startRef,
+                        segments[si + 1].endRef,
+                      )
+                    : false;
 
                 return (
-                  <span
-                    key={occ.id}
-                    className={cn(
-                      "transition-colors",
-                      !isInActiveGroup && "cursor-pointer",
-                      isInActiveGroup && "bg-sky-200 rounded px-0.5",
-                      approved && !isInActiveGroup && "text-emerald-700",
-                      !approved && !isInActiveGroup && "text-muted-foreground",
-                    )}
-                    onClick={() => groupIndex !== -1 && fadeToGroup(groupIndex)}
-                    onDoubleClick={() =>
-                      splitSegmentAtOccurrence(seg.id, occ.id)
-                    }
-                  >
-                    {occ.surfaceText}
-                    {!isLastToken && !isPunct && !nextIsPunct && " "}
-                    {!isLastToken && isPunct && " "}
-                  </span>
-                );
-              }),
-            )}
-          </p>
-        )}
+                  <div key={seg.id} className="mb-1 last:mb-0">
+                    {/* Token line */}
+                    <div className="flex items-start gap-1">
+                      <p className="flex-1 text-sm font-mono leading-relaxed text-foreground">
+                        {seg.occurrences.map((occ, oi) => {
+                          const groupIndex =
+                            occurrenceGroupMap.get(occ.id) ?? -1;
+                          const isInActiveGroup =
+                            groupIndex === activeGroupIndex;
+                          const approved = occApprovedById.get(occ.id) ?? false;
+                          const isPunct =
+                            occ.type === OccurrenceType.Punctuation;
+                          const nextOcc =
+                            seg.occurrences[oi + 1] ??
+                            segments[si + 1]?.occurrences[0];
+                          const isLastToken =
+                            si === segments.length - 1 &&
+                            oi === seg.occurrences.length - 1;
+                          const nextIsPunct =
+                            nextOcc?.type === OccurrenceType.Punctuation;
 
-        {/* Segment layout mode (translation lines visible) */}
-        {(textConfig.showLiteral || textConfig.showFree) &&
-          segments.map((seg, si) => {
-            const segIsMerged = !sameBcv(seg.startRef, seg.endRef);
-            const nextSegIsMerged =
-              si < segments.length - 1
-                ? !sameBcv(segments[si + 1].startRef, segments[si + 1].endRef)
-                : false;
-
-            return (
-              <div key={seg.id} className="mb-1 last:mb-0">
-                {/* Token line */}
-                <div className="flex items-start gap-1">
-                  <p className="flex-1 text-sm font-mono leading-relaxed text-foreground">
-                    {seg.occurrences.map((occ, oi) => {
-                      const groupIndex = occurrenceGroupMap.get(occ.id) ?? -1;
-                      const isInActiveGroup = groupIndex === activeGroupIndex;
-                      const approved = occApprovedById.get(occ.id) ?? false;
-                      const isPunct = occ.type === OccurrenceType.Punctuation;
-                      const nextOcc =
-                        seg.occurrences[oi + 1] ??
-                        segments[si + 1]?.occurrences[0];
-                      const isLastToken =
-                        si === segments.length - 1 &&
-                        oi === seg.occurrences.length - 1;
-                      const nextIsPunct =
-                        nextOcc?.type === OccurrenceType.Punctuation;
-
-                      return (
-                        <span
-                          key={occ.id}
-                          className={cn(
-                            "transition-colors",
-                            !isInActiveGroup && "cursor-pointer",
-                            isInActiveGroup && "bg-sky-200 rounded px-0.5",
-                            approved && !isInActiveGroup && "text-emerald-700",
-                            !approved &&
-                              !isInActiveGroup &&
-                              "text-muted-foreground",
-                          )}
-                          onClick={() =>
-                            groupIndex !== -1 && fadeToGroup(groupIndex)
+                          return (
+                            <span
+                              key={occ.id}
+                              className={cn(
+                                "transition-colors",
+                                !isInActiveGroup && "cursor-pointer",
+                                isInActiveGroup && "bg-sky-200 rounded px-0.5",
+                                approved &&
+                                  !isInActiveGroup &&
+                                  "text-emerald-700",
+                                !approved &&
+                                  !isInActiveGroup &&
+                                  "text-muted-foreground",
+                              )}
+                              onClick={() =>
+                                groupIndex !== -1 && fadeToGroup(groupIndex)
+                              }
+                              onDoubleClick={() =>
+                                splitSegmentAtOccurrence(seg.id, occ.id)
+                              }
+                            >
+                              {occ.surfaceText}
+                              {!isLastToken && !isPunct && !nextIsPunct && " "}
+                              {!isLastToken && isPunct && " "}
+                            </span>
+                          );
+                        })}
+                      </p>
+                    </div>
+                    {textConfig.showLiteral && (
+                      <div className="mt-1 flex items-center gap-1">
+                        <Textarea
+                          className="text-xs min-h-0 h-8 py-1 resize-none font-mono"
+                          placeholder="Literal…"
+                          value={segmentTranslations[seg.id]?.literal ?? ""}
+                          onChange={(e) =>
+                            updateLiteralTranslation(seg.id, e.target.value)
                           }
-                          onDoubleClick={() =>
-                            splitSegmentAtOccurrence(seg.id, occ.id)
-                          }
+                        />
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          aria-label="Copy glosses into literal translation"
+                          onClick={() => copyGlossesToLiteral(seg.id)}
+                          className="shrink-0 text-muted-foreground hover:text-foreground"
                         >
-                          {occ.surfaceText}
-                          {!isLastToken && !isPunct && !nextIsPunct && " "}
-                          {!isLastToken && isPunct && " "}
-                        </span>
-                      );
-                    })}
-                  </p>
-                </div>
-                {textConfig.showLiteral && (
-                  <div className="mt-1 flex items-center gap-1">
-                    <Textarea
-                      className="text-xs min-h-0 h-8 py-1 resize-none font-mono"
-                      placeholder="Literal…"
-                      value={segmentTranslations[seg.id]?.literal ?? ""}
-                      onChange={(e) =>
-                        updateLiteralTranslation(seg.id, e.target.value)
-                      }
-                    />
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      aria-label="Copy glosses into literal translation"
-                      onClick={() => copyGlossesToLiteral(seg.id)}
-                      className="shrink-0 text-muted-foreground hover:text-foreground"
-                    >
-                      <Copy className="size-3.5" />
-                    </Button>
+                          <Copy className="size-3.5" />
+                        </Button>
+                      </div>
+                    )}
+                    {textConfig.showFree && (
+                      <Textarea
+                        className="mt-1 text-xs min-h-0 h-8 py-1 resize-none font-mono"
+                        placeholder="Free…"
+                        value={segmentTranslations[seg.id]?.free ?? ""}
+                        onChange={(e) =>
+                          updateFreeTranslation(seg.id, e.target.value)
+                        }
+                      />
+                    )}
+                    {/* Merge button between this segment and the next */}
+                    {si < segments.length - 1 && (
+                      <div className="flex justify-center my-0.5">
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          onClick={() =>
+                            mergeSegments(seg.id, segments[si + 1].id)
+                          }
+                          aria-label="Merge with next segment"
+                          disabled={nextSegIsMerged}
+                          className="h-4 w-4 text-muted-foreground/40 hover:text-muted-foreground disabled:opacity-20"
+                        >
+                          <Link2 className="size-3" />
+                        </Button>
+                      </div>
+                    )}
                   </div>
-                )}
-                {textConfig.showFree && (
-                  <Textarea
-                    className="mt-1 text-xs min-h-0 h-8 py-1 resize-none font-mono"
-                    placeholder="Free…"
-                    value={segmentTranslations[seg.id]?.free ?? ""}
-                    onChange={(e) =>
-                      updateFreeTranslation(seg.id, e.target.value)
-                    }
-                  />
-                )}
-                {/* Merge button between this segment and the next */}
-                {si < segments.length - 1 && (
-                  <div className="flex justify-center my-0.5">
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      onClick={() => mergeSegments(seg.id, segments[si + 1].id)}
-                      aria-label="Merge with next segment"
-                      disabled={nextSegIsMerged}
-                      className="h-4 w-4 text-muted-foreground/40 hover:text-muted-foreground disabled:opacity-20"
-                    >
-                      <Link2 className="size-3" />
-                    </Button>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-          </div>{/* end flex-1 min-w-0 text content */}
+                );
+              })}
+          </div>
+          {/* end flex-1 min-w-0 text content */}
 
           {/* Text config panel — right-side sibling, mirrors row-order panel */}
           {textConfig.isOpen && (
@@ -803,7 +814,8 @@ export function Interlinearizer() {
               </div>
             </div>
           )}
-        </div>{/* end flex items-start gap-2 */}
+        </div>
+        {/* end flex items-start gap-2 */}
       </div>
     </div>
   );
