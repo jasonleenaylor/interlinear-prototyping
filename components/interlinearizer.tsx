@@ -84,8 +84,8 @@ export function Interlinearizer() {
 
   const sameBcv = useCallback(
     (
-      a: { book: string; chapter: number; verse: number; fragment?: string },
-      b: { book: string; chapter: number; verse: number; fragment?: string },
+      a: { book: string; chapter: number; verse: number; charIndex?: number },
+      b: { book: string; chapter: number; verse: number; charIndex?: number },
     ) => a.book === b.book && a.chapter === b.chapter && a.verse === b.verse,
     [],
   );

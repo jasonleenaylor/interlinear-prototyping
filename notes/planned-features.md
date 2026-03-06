@@ -560,7 +560,7 @@ two sections feel consistent.
 ## P-01 · Eliminate initial strip position flash
 
 **Type:** performance
-**Status:** open
+**Status:** done — committed
 
 ### Description
 `translateX` is initialised to `0`. The two `useEffect`s that call `recalcTranslate`
