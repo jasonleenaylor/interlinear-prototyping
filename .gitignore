@@ -1,9 +1,12 @@
 __pycache__/
 *.pyc
 .venv/
-results/
+results/*
+!results/interlinear-model.ts
 node_modules/
 .next/
 tsconfig.tsbuildinfo
 package-lock.json
+projects-with-interlinear-2026-02-06.json
+report-results-show-all-project-that-have-at-least-one-interlinear-folder..json
 *.zip
