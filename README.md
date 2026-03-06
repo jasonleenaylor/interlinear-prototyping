@@ -79,17 +79,13 @@ A prominent header comment explains the sync convention:
 
 ## Research Scripts
 
-### Data
-
-- Large source file (already present in repo root):
-  - `report-results-show-all-project-that-have-at-least-one-interlinear-folder..json`
 
 ### `scripts/analyze_interlinear.py`
 Entry point for analysis. Requires an explicit `--input` path and never reads the large file by default.
 
 ```bash
 python scripts/analyze_interlinear.py \
-  --input "report-results-show-all-project-that-have-at-least-one-interlinear-folder..json" \
+  --input "report-results-show-all-project-that-have-at-least-one-interlinear-folder.json" \
   --output results/summary.json
 ```
 
