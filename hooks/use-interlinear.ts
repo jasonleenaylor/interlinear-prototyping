@@ -38,7 +38,7 @@ function sameRef(
     a.book === b.book &&
     a.chapter === b.chapter &&
     a.verse === b.verse &&
-    (a.fragment ?? "") === (b.fragment ?? "")
+    (a.charIndex ?? 0) === (b.charIndex ?? 0)
   );
 }
 
@@ -414,13 +414,7 @@ export function useInterlinear() {
         return prev; // allow extending a merged segment forward, but avoid merging into already-merged next segment
       }
       const mergedId = a.id;
-      const mergedOccurrences = [...a.occurrences, ...b.occurrences].map(
-        (occ, idx) => ({
-          ...occ,
-          segmentId: mergedId,
-          index: idx,
-        }),
-      );
+      const mergedOccurrences = [...a.occurrences, ...b.occurrences];
       const merged: CanonicalSegment = {
         ...a,
         startRef: a.startRef,
@@ -462,29 +456,27 @@ export function useInterlinear() {
 
         if (splitAt <= 0) return prev;
 
-        const leftOcc = seg.occurrences.slice(0, splitAt).map((o, i) => ({
-          ...o,
-          segmentId: seg.id,
-          index: i,
-        }));
+        const leftOcc = seg.occurrences.slice(0, splitAt);
 
         const rightId = `${seg.id}~split~${++splitIdCounterRef.current}`;
         createdRightId = rightId;
-        const rightOcc = seg.occurrences.slice(splitAt).map((o, i) => ({
-          ...o,
-          segmentId: rightId,
-          index: i,
-        }));
+        const rightOcc = seg.occurrences.slice(splitAt);
 
         const sameVerseRange = sameBcv(seg.startRef, seg.endRef);
+        // Approximate character offset at the split point: sum of surface text
+        // lengths of all occurrences before the split, plus one separator each.
+        // A more precise implementation would scan baselineText directly.
+        const splitCharIndex = seg.occurrences
+          .slice(0, splitAt)
+          .reduce((acc, o) => acc + o.surfaceText.length + 1, 0);
         const leftEnd = sameVerseRange
-          ? { ...seg.startRef, fragment: "a" }
+          ? { ...seg.startRef, charIndex: splitCharIndex }
           : seg.startRef;
         const rightStart = sameVerseRange
-          ? { ...seg.startRef, fragment: "b" }
+          ? { ...seg.startRef, charIndex: splitCharIndex }
           : seg.endRef;
         const rightEnd = sameVerseRange
-          ? { ...seg.endRef, fragment: "b" }
+          ? { ...seg.endRef, charIndex: splitCharIndex }
           : seg.endRef;
 
         const leftSeg: CanonicalSegment = {

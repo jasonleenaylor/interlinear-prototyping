@@ -119,8 +119,8 @@ export interface AnalyzedBook {
 // ---------------------------------------------------------------------------
 
 /**
- * A sentence, clause, or verse — the unit within which occurrences are
- * ordered.
+ * A range of text in a book — could be a sentence, clause, or verse —
+ * which groups ordered occurrences.
  *
  * Source-system mapping:
  * - LCM: `ISegment` owned by `IScrTxtPara` within `IScrSection`.
@@ -130,35 +130,41 @@ export interface AnalyzedBook {
 export interface Segment {
   id: string;
 
-  /** Start of the scripture range for this segment (BCVF). */
+  /** Inclusive start of the text range for this segment, anchored to a specific character position within its verse. */
   startRef: ScriptureRef;
 
-  /** End of the scripture range for this segment (BCVF). */
+  /** Inclusive end of the text range for this segment, anchored to a specific character position within its verse. */
   endRef: ScriptureRef;
 
-  /** Raw text of the segment, for display and validation. */
+  /** Raw text of the segment, for validation and convenience. */
   baselineText?: string;
 
   /** Idiomatic translation of the segment. */
   freeTranslation?: MultiString;
 
-  /** Word-for-word translation. */
+  /** Word-for-word translation, can be generated from the analysis glosses. */
   literalTranslation?: MultiString;
 
   /** Ordered word / punctuation tokens in this segment. */
   occurrences: Occurrence[];
 }
 
-/** Scripture reference in BCVF form (Book-Chapter-Verse-Fragment). */
+/**
+ * A character-level scripture reference anchored to a specific position
+ * within a verse's baseline text.
+ *
+ * `charIndex` is the zero-based character offset within the verse's
+ * baseline text. When absent the reference is verse-level only.
+ */
 export interface ScriptureRef {
   book: string;
   chapter: number;
   verse: number;
-  /** Optional verse fragment marker, e.g. "a", "b". */
-  fragment?: string;
+  /** Zero-based character offset within the verse's baseline text. */
+  charIndex?: number;
 }
 
-/** A string value keyed by writing-system tag. */
+/** A string value keyed by BCP 47 writing-system tag. */
 export type MultiString = Record<string, string>;
 
 // ---------------------------------------------------------------------------
@@ -166,8 +172,7 @@ export type MultiString = Record<string, string>;
 // ---------------------------------------------------------------------------
 
 /**
- * A single word or punctuation token at a specific position in the text.
- * Inherits its text version from the parent AnalyzedBook.
+ * A single word or punctuation token in a segment's ordered sequence.
  *
  * Source-system mapping:
  * - LCM: entry in `ISegment.AnalysesRS` at a given index.
@@ -177,29 +182,17 @@ export type MultiString = Record<string, string>;
 export interface Occurrence {
   id: string;
 
-  /** Parent segment. */
-  segmentId: string;
-
-  /** Zero-based position within the segment (preserves word order). */
-  index: number;
-
-  /**
-   * Positional anchor in the source text.
-   * Supports BCVWP, BCVWP+partNum, StringRange, or character offset
-   * depending on source system.
-   */
-  anchor: string;
-
   /** The text as it appears in the source. */
   surfaceText: string;
 
   /** Writing system of `surfaceText`. */
   writingSystem: string;
 
+  /** Whether this token is a word or punctuation. */
   type: OccurrenceType;
 
-  /** All analysis assignments for this occurrence (zero or more). */
-  assignments: AnalysisAssignment[];
+  /** The analysis assignment for this occurrence, if one has been made. */
+  assignment?: AnalysisAssignment;
 }
 
 // ---------------------------------------------------------------------------
@@ -224,31 +217,24 @@ export interface Occurrence {
 export interface Analysis {
   id: string;
 
-  /** Writing system of the analysis (e.g. the gloss language). */
-  analysisLanguage: string;
-
   analysisType: AnalysisType;
 
   confidence: Confidence;
 
-  /** System that produced the analysis (e.g. "lcm", "paratext"). */
-  sourceSystem: string;
+  /** Identifies the producer of this analysis — a person or any kind of automated process. */
+  producer: string;
 
-  /**
-   * User or automation identifier within the source system
-   * (e.g. "jsmith", "parser-v3", "auto-glosser"). Use a stable
-   * automation ID when no human directly applied the analysis.
-   */
+  /** Identifies who or what performed this specific analysis — a person's ID or a stable identifier for the process that generated it. */
   sourceUser: string;
 
-  /** Word-level gloss text. */
-  glossText?: string;
+  /** Word-level gloss text, keyed by BCP 47 language tag (e.g. `{ en: "beginning" }`). */
+  glossText?: MultiString;
 
   /** Part of speech. */
   pos?: string;
 
-  /** Morphosyntactic feature structure. */
-  features?: Record<string, unknown>;
+  /** Morphosyntactic features as a flat attribute-value map (e.g. `{ Case: "Nom", Number: "Sg" }`). */
+  features?: Record<string, string>;
 
   /**
    * Ordered morpheme breakdown, when analysis is at the morpheme level
@@ -262,8 +248,8 @@ export interface Analysis {
 // ---------------------------------------------------------------------------
 
 /**
- * The join between an occurrence and an analysis.  Multiple assignments
- * per occurrence enable competing analyses.
+ * Links an occurrence to an analysis, recording who approved it and optionally
+ * grouping it with other occurrences into a phrase.
  *
  * **Phrase grouping via `groupId`**
  *
@@ -300,7 +286,7 @@ export interface AnalysisAssignment {
   /** The analysis applied. */
   analysisId: string;
 
-  /** Whether a human has confirmed this analysis for this occurrence. */
+  /** Review status — where this assignment sits in the analysis lifecycle. */
   status: AssignmentStatus;
 
   /**
@@ -316,9 +302,6 @@ export interface AnalysisAssignment {
    * When absent the assignment is a normal single-word assignment.
    */
   groupId?: string;
-
-  /** Timestamp of when the assignment was made. */
-  createdAt?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -375,34 +358,22 @@ export interface AnalysisAssignment {
 export interface MorphemeBundle {
   id: string;
 
-  /** Zero-based position within the analysis (preserves morpheme order). */
-  index: number;
-
   /** The morpheme form as it appears in this analysis (surface text). */
   form: string;
 
   /** Writing system of `form`. */
   writingSystem: string;
 
-  /**
-   * Reference to a specific Allomorph (`IMoForm`) in the lexical model.
-   *
-   * An `ILexEntry` in LCM owns one *LexemeForm* (the elsewhere / citation
-   * allomorph) and zero-or-more *AlternateForms*. This field identifies
-   * which allomorph was matched in this morpheme position.
-   *
-   * In the BT Extension the "morph" concept aligns with this field:
-   * the HeadWord's lemma acts as the LexemeForm (elsewhere allomorph).
-   */
+  /** Reference to a specific allomorph in the lexical model. */
   allomorphRef?: string;
 
-  /** Reference to Lexeme (`ILexEntry`) in the lexical model. */
+  /** Reference to a lexeme in the lexical model. */
   lexemeRef?: string;
 
-  /** Reference to Sense (`ILexSense`) in the lexical model. */
+  /** Reference to a sense in the lexical model. */
   senseRef?: string;
 
-  /** Reference to Grammar / MSA (`IMoMorphSynAnalysis`) in the lexical model. */
+  /** Reference to a grammatical / morphosyntactic analysis in the lexical model. */
   grammarRef?: string;
 }
 

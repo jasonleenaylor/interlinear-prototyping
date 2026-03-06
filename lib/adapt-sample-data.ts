@@ -83,16 +83,15 @@ function collectGroupMembers(segments: Segment[]): GroupMap {
 
   for (const seg of segments) {
     for (const occ of seg.occurrences) {
-      for (const asgn of occ.assignments) {
-        if (asgn.groupId) {
-          let list = map.get(asgn.groupId);
-          if (!list) {
-            list = [];
-            map.set(asgn.groupId, list);
-          }
-          if (!list.includes(occ.id)) {
-            list.push(occ.id);
-          }
+      const groupId = occ.assignment?.groupId;
+      if (groupId) {
+        let list = map.get(groupId);
+        if (!list) {
+          list = [];
+          map.set(groupId, list);
+        }
+        if (!list.includes(occ.id)) {
+          list.push(occ.id);
         }
       }
     }
@@ -109,16 +108,16 @@ function adaptOne(
 ): UiOccurrence {
   const isPunctuation = occ.type === OccurrenceType.Punctuation;
 
-  // Resolve the first assignment's analysis (if any)
-  const firstAssignment = occ.assignments[0];
-  const analysis = firstAssignment
-    ? analysisLookup[firstAssignment.analysisId]
+  // Resolve the assignment's analysis (if any)
+  const analysis = occ.assignment
+    ? analysisLookup[occ.assignment.analysisId]
     : undefined;
 
   // Gloss: from the analysis. For grouped phrases the same analysis
   // (and therefore the same glossText) is on every member; the hook
   // only reads the gloss from the first group member, so this is fine.
-  const gloss = analysis?.glossText ?? "";
+  // Take the first available language's value from the MultiString.
+  const gloss = Object.values(analysis?.glossText ?? {})[0] ?? "";
 
   // Morpheme text: if the analysis has morphemeBundles, join their
   // forms with spaces (which the MorphemeEditor will split back into
@@ -128,10 +127,8 @@ function adaptOne(
       ? analysis.morphemeBundles.map((mb) => mb.form).join(" ")
       : occ.surfaceText;
 
-  // Approved: true when any assignment has status Approved
-  const approved = occ.assignments.some(
-    (a) => a.status === AssignmentStatus.Approved,
-  );
+  // Approved: true when the assignment has status Approved
+  const approved = occ.assignment?.status === AssignmentStatus.Approved;
 
   return {
     id: occ.id,

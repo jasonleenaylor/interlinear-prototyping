@@ -34,7 +34,7 @@ import {
 
 let globalOccId = 0;
 
-function tokenize(segmentId: string, text: string, ws = "es"): Occurrence[] {
+function tokenize(text: string, ws = "es"): Occurrence[] {
   const tokens: string[] = [];
   let current = "";
 
@@ -61,18 +61,14 @@ function tokenize(segmentId: string, text: string, ws = "es"): Occurrence[] {
   }
   if (current) tokens.push(current);
 
-  return tokens.map((t, i) => {
+  return tokens.map((t) => {
     const id = `occ-${++globalOccId}`;
     const isPunct = /^[^\p{L}\p{N}]$/u.test(t);
     return {
       id,
-      segmentId,
-      index: i,
-      anchor: "", // no anchor scheme for sample data
       surfaceText: t,
       writingSystem: ws,
       type: isPunct ? OccurrenceType.Punctuation : OccurrenceType.Word,
-      assignments: [],
     } satisfies Occurrence;
   });
 }
@@ -128,7 +124,7 @@ function buildSegments(): Segment[] {
       startRef: { book: "GEN", chapter: 1, verse: verseNum },
       endRef: { book: "GEN", chapter: 1, verse: verseNum },
       baselineText: text,
-      occurrences: tokenize(segId, text),
+      occurrences: tokenize(text),
     };
   });
 }
@@ -152,47 +148,42 @@ const analyses: Record<string, Analysis> = {
   // -- Phrase: "En el" → "In the" (grouped gloss) --------------------------
   enEl: {
     id: "an-en-el",
-    analysisLanguage: "en",
     analysisType: AnalysisType.Gloss,
     confidence: Confidence.High,
-    sourceSystem: "manual",
+    producer: "manual",
     sourceUser: "sample",
-    glossText: "In the",
+    glossText: { en: "In the" },
     pos: "PREP+ART",
   },
 
   // -- "principio" → "beginning" -------------------------------------------
   principio: {
     id: "an-principio",
-    analysisLanguage: "en",
     analysisType: AnalysisType.Gloss,
     confidence: Confidence.High,
-    sourceSystem: "manual",
+    producer: "manual",
     sourceUser: "sample",
-    glossText: "beginning",
+    glossText: { en: "beginning" },
     pos: "N",
   },
 
   // -- "creó" → morph: "cre-" (create) + "-ó" (3SG.PST) -------------------
   creo: {
     id: "an-creo",
-    analysisLanguage: "en",
     analysisType: AnalysisType.Morph,
     confidence: Confidence.High,
-    sourceSystem: "manual",
+    producer: "manual",
     sourceUser: "sample",
-    glossText: "created",
+    glossText: { en: "created" },
     pos: "V",
     morphemeBundles: [
       {
         id: "mb-creo-1",
-        index: 0,
         form: "cre",
         writingSystem: "es",
       },
       {
         id: "mb-creo-2",
-        index: 1,
         form: "ó",
         writingSystem: "es",
       },
@@ -202,47 +193,42 @@ const analyses: Record<string, Analysis> = {
   // -- "Dios" → "God" ------------------------------------------------------
   dios: {
     id: "an-dios",
-    analysisLanguage: "en",
     analysisType: AnalysisType.Gloss,
     confidence: Confidence.High,
-    sourceSystem: "manual",
+    producer: "manual",
     sourceUser: "sample",
-    glossText: "God",
+    glossText: { en: "God" },
     pos: "N.PROP",
   },
 
   // -- "los" → "the" (masc pl article) -------------------------------------
   los: {
     id: "an-los",
-    analysisLanguage: "en",
     analysisType: AnalysisType.Gloss,
     confidence: Confidence.High,
-    sourceSystem: "manual",
+    producer: "manual",
     sourceUser: "sample",
-    glossText: "the",
+    glossText: { en: "the" },
     pos: "ART",
   },
 
   // -- "cielos" → morph: "ciel-" (heaven/sky) + "-os" (M.PL) --------------
   cielos: {
     id: "an-cielos",
-    analysisLanguage: "en",
     analysisType: AnalysisType.Morph,
     confidence: Confidence.High,
-    sourceSystem: "manual",
+    producer: "manual",
     sourceUser: "sample",
-    glossText: "heavens",
+    glossText: { en: "heavens" },
     pos: "N",
     morphemeBundles: [
       {
         id: "mb-cielos-1",
-        index: 0,
         form: "ciel",
         writingSystem: "es",
       },
       {
         id: "mb-cielos-2",
-        index: 1,
         form: "os",
         writingSystem: "es",
       },
@@ -252,47 +238,42 @@ const analyses: Record<string, Analysis> = {
   // -- "y" → "and" ---------------------------------------------------------
   y: {
     id: "an-y",
-    analysisLanguage: "en",
     analysisType: AnalysisType.Gloss,
     confidence: Confidence.High,
-    sourceSystem: "manual",
+    producer: "manual",
     sourceUser: "sample",
-    glossText: "and",
+    glossText: { en: "and" },
     pos: "CONJ",
   },
 
   // -- "la" → "the" (fem sg article) ---------------------------------------
   la: {
     id: "an-la",
-    analysisLanguage: "en",
     analysisType: AnalysisType.Gloss,
     confidence: Confidence.High,
-    sourceSystem: "manual",
+    producer: "manual",
     sourceUser: "sample",
-    glossText: "the",
+    glossText: { en: "the" },
     pos: "ART",
   },
 
   // -- "tierra" → morph: "tierr-" (earth/land) + "-a" (F.SG) --------------
   tierra: {
     id: "an-tierra",
-    analysisLanguage: "en",
     analysisType: AnalysisType.Morph,
     confidence: Confidence.High,
-    sourceSystem: "manual",
+    producer: "manual",
     sourceUser: "sample",
-    glossText: "earth",
+    glossText: { en: "earth" },
     pos: "N",
     morphemeBundles: [
       {
         id: "mb-tierra-1",
-        index: 0,
         form: "tierr",
         writingSystem: "es",
       },
       {
         id: "mb-tierra-2",
-        index: 1,
         form: "a",
         writingSystem: "es",
       },
@@ -302,10 +283,9 @@ const analyses: Record<string, Analysis> = {
   // -- punctuation "." → (no gloss) ----------------------------------------
   period: {
     id: "an-period",
-    analysisLanguage: "en",
     analysisType: AnalysisType.Punctuation,
     confidence: Confidence.High,
-    sourceSystem: "manual",
+    producer: "manual",
     sourceUser: "sample",
   },
 };
@@ -324,13 +304,13 @@ function attachVerse1Assignments(segments: Segment[]): void {
     analysis: Analysis,
     groupId?: string,
   ): void => {
-    occ.assignments.push({
+    occ.assignment = {
       id: `asgn-${occ.id}`,
       occurrenceId: occ.id,
       analysisId: analysis.id,
       status: AssignmentStatus.Approved,
       groupId,
-    } satisfies AnalysisAssignment);
+    } satisfies AnalysisAssignment;
   };
 
   // "En" + "el" → phrase group sharing "In the" analysis
